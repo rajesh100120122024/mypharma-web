@@ -33,7 +33,7 @@ function PdfUploader() {
     formData.append('pdf', file);
 
     try {
-      const response = await axios.post('http://localhost:3000/upload', formData, {
+      const response = await axios.post('https://mypharma-backend-4w2z.onrender.com/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

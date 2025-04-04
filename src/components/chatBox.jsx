@@ -28,7 +28,7 @@ function ChatBox() {
     setLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:3000/chat', {
+      const response = await axios.post('https://mypharma-backend-4w2z.onrender.com/chat', {
         message: input,
       });
       setMessages([...newMessages, { type: 'bot', text: response.data.reply }]);
