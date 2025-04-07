@@ -38,6 +38,8 @@ function PdfUploader() {
 
     try {
       const base64 = await fileToBase64(file);
+      console.log("📤 Sending base64 JSON to Lambda...");
+
 
       const response = await axios.post(
         'https://bd1u0nv3fj.execute-api.ap-south-1.amazonaws.com/prod/upload',
@@ -49,11 +51,12 @@ function PdfUploader() {
           responseType: 'blob',
         }
       );
-
+      console.log("✅ Received response:", response);
       const url = window.URL.createObjectURL(new Blob([response.data]));
       setDownloadLink(url);
     } catch (error) {
-      alert('⚠️ Upload failed');
+      console.error("❌ Upload failed:", error);
+      alert('⚠️ Upload failed. Check browser console for details.');
       console.error('Lambda Error:', error);
     }
 
