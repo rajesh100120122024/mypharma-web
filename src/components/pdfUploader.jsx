@@ -1,4 +1,4 @@
-// PdfUploader.jsx - Stylish PDF to Excel uploader for MyPharma
+// PdfUploader.jsx - Updated for base64 JSON upload (Lambda compatible)
 
 import React, { useState } from 'react';
 import {
@@ -8,9 +8,7 @@ import {
   Paper,
   Input,
   CircularProgress,
-  Stack,
-  CloudUpload,
-  Download
+  Stack
 } from '@mui/material';
 import axios from 'axios';
 import { CloudUpload as UploadIcon, Download as DownloadIcon } from '@mui/icons-material';
@@ -25,26 +23,40 @@ function PdfUploader() {
     setDownloadLink(null);
   };
 
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]); // remove base64 prefix
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleUpload = async () => {
     if (!file) return;
     setLoading(true);
 
-    const formData = new FormData();
-    formData.append('pdf', file);
-
     try {
-      const response = await axios.post('https://bd1u0nv3fj.execute-api.ap-south-1.amazonaws.com/prod/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        responseType: 'blob',
-      });
+      const base64 = await fileToBase64(file);
+
+      const response = await axios.post(
+        'https://bd1u0nv3fj.execute-api.ap-south-1.amazonaws.com/prod/upload',
+        JSON.stringify({ pdf: base64 }),
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          responseType: 'blob',
+        }
+      );
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
       setDownloadLink(url);
     } catch (error) {
       alert('⚠️ Upload failed');
+      console.error('Lambda Error:', error);
     }
+
     setLoading(false);
   };
 
@@ -56,7 +68,12 @@ function PdfUploader() {
 
       <Paper elevation={4} sx={{ p: 3, bgcolor: '#fff3e0' }}>
         <Stack spacing={2}>
-          <Input type="file" onChange={handleFileChange} fullWidth sx={{ bgcolor: 'white', p: 1 }} />
+          <Input
+            type="file"
+            onChange={handleFileChange}
+            fullWidth
+            sx={{ bgcolor: 'white', p: 1 }}
+          />
 
           <Button
             variant="contained"
