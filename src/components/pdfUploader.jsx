@@ -1,88 +1,67 @@
-// PdfUploader.jsx - Stylish PDF to Excel uploader for MyPharma
-
 import React, { useState } from 'react';
-import {
-  Box,
-  Button,
-  Typography,
-  Paper,
-  Input,
-  CircularProgress,
-  Stack,
-  CloudUpload,
-  Download
-} from '@mui/material';
-import axios from 'axios';
-import { CloudUpload as UploadIcon, Download as DownloadIcon } from '@mui/icons-material';
 
-function PdfUploader() {
+const PdfUploader = () => {
   const [file, setFile] = useState(null);
+  const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
-  const [downloadLink, setDownloadLink] = useState(null);
 
-  const handleFileChange = (event) => {
-    setFile(event.target.files[0]);
-    setDownloadLink(null);
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]); // remove base64 prefix
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file) {
+      setStatus('Please select a file first.');
+      return;
+    }
+
+    setStatus('');
     setLoading(true);
 
-    const formData = new FormData();
-    formData.append('pdf', file);
-
     try {
-      const response = await axios.post('https://bd1u0nv3fj.execute-api.ap-south-1.amazonaws.com/prod/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        responseType: 'blob',
+      const base64 = await fileToBase64(file);
+      const response = await fetch("https://bd1u0nv3fj.execute-api.ap-south-1.amazonaws.com/prod/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pdf: base64 })
       });
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      setDownloadLink(url);
-    } catch (error) {
-      alert('⚠️ Upload failed');
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "output.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setStatus("✅ File processed and downloaded.");
+    } catch (err) {
+      console.error(err);
+      setStatus("❌ Upload failed.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
-    <Box sx={{ maxWidth: 700, mx: 'auto', p: 2 }}>
-      <Typography variant="h5" color="secondary" gutterBottom>
-        📄 Upload Prescription PDF
-      </Typography>
-
-      <Paper elevation={4} sx={{ p: 3, bgcolor: '#fff3e0' }}>
-        <Stack spacing={2}>
-          <Input type="file" onChange={handleFileChange} fullWidth sx={{ bgcolor: 'white', p: 1 }} />
-
-          <Button
-            variant="contained"
-            startIcon={<UploadIcon />}
-            disabled={!file || loading}
-            onClick={handleUpload}
-            color="secondary"
-          >
-            {loading ? <CircularProgress size={20} /> : 'Upload & Convert'}
-          </Button>
-
-          {downloadLink && (
-            <Button
-              variant="outlined"
-              color="primary"
-              startIcon={<DownloadIcon />}
-              href={downloadLink}
-              download="output.xlsx"
-            >
-              📥 Download Excel
-            </Button>
-          )}
-        </Stack>
-      </Paper>
-    </Box>
+    <div style={{ padding: "1rem", background: "#f0f4ff", borderRadius: "12px" }}>
+      <h3>📄 Upload Prescription PDF</h3>
+      <input type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files[0])} />
+      <button onClick={handleUpload} disabled={!file || loading} style={{ marginTop: "1rem" }}>
+        {loading ? "Processing..." : "Upload & Convert"}
+      </button>
+      <div style={{ marginTop: "0.5rem", color: status.startsWith("✅") ? "green" : "red" }}>{status}</div>
+    </div>
   );
-}
+};
 
 export default PdfUploader;
