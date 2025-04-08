@@ -35,12 +35,11 @@ function PdfUploader() {
   const handleUpload = async () => {
     if (!file) return;
     setLoading(true);
-
+  
     try {
       const base64 = await fileToBase64(file);
       console.log("📤 Sending base64 JSON to Lambda...");
-
-
+  
       const response = await axios.post(
         'https://bd1u0nv3fj.execute-api.ap-south-1.amazonaws.com/prod/upload',
         JSON.stringify({ pdf: base64 }),
@@ -48,20 +47,31 @@ function PdfUploader() {
           headers: {
             'Content-Type': 'application/json',
           },
-          responseType: 'blob',
+          responseType: 'text', // 🔄 important: we expect base64 string, not blob!
         }
       );
-      console.log("✅ Received response:", response);
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+  
+      console.log("✅ Received base64 string from Lambda:", response.data);
+  
+      // Convert base64 → binary → Blob
+      const byteCharacters = atob(response.data); // decode base64
+      const byteNumbers = new Array(byteCharacters.length).fill().map((_, i) => byteCharacters.charCodeAt(i));
+      const byteArray = new Uint8Array(byteNumbers);
+  
+      const blob = new Blob([byteArray], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+  
+      const url = window.URL.createObjectURL(blob);
       setDownloadLink(url);
     } catch (error) {
       console.error("❌ Upload failed:", error);
       alert('⚠️ Upload failed. Check browser console for details.');
-      console.error('Lambda Error:', error);
     }
-
+  
     setLoading(false);
   };
+  
 
   return (
     <Box sx={{ maxWidth: 700, mx: 'auto', p: 2 }}>
