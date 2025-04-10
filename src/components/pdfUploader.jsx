@@ -41,7 +41,7 @@ function PdfUploader() {
       console.log("📤 Sending base64 JSON to Lambda...");
   
       const response = await axios.post(
-        'https://bd1u0nv3fj.execute-api.ap-south-1.amazonaws.com/prod/upload',
+        'https://inordedh6h.execute-api.ap-south-1.amazonaws.com/Prod/start',
         JSON.stringify({ pdf: base64 }),
         {
           headers: {
