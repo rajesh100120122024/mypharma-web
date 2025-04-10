@@ -35,11 +35,14 @@ function PdfUploader() {
       console.log(`🔄 Polling attempt ${i + 1}...`);
       try {
         const res = await axios.get(`https://your-api-url.com/result?executionArn=${encodeURIComponent(executionArn)}`);
-
-        if (res.data && res.data.base64Excel) {
-          console.log("✅ Excel file is ready!");
-          return res.data.base64Excel;
-        }
+        // Parse properly
+        const body = typeof res.data.excelResult?.body === "string"
+          ? JSON.parse(res.data.excelResult.body)
+          : res.data.excelResult.body;
+          if (body?.base64Excel) {
+            console.log("✅ Excel file ready");
+            return body.base64Excel;
+          }
       } catch (err) {
         console.log("⏳ Still processing...");
       }
