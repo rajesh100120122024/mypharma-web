@@ -1,5 +1,3 @@
-// PdfUploader.jsx - Updated for base64 JSON upload (Lambda compatible)
-
 import React, { useState } from 'react';
 import {
   Box,
@@ -32,46 +30,67 @@ function PdfUploader() {
     });
   };
 
+  const pollForResult = async (executionArn, retries = 20, interval = 5000) => {
+    for (let i = 0; i < retries; i++) {
+      console.log(`🔄 Polling attempt ${i + 1}...`);
+      try {
+        const res = await axios.get(`https://your-api-url.com/result?executionArn=${encodeURIComponent(executionArn)}`);
+
+        if (res.data && res.data.base64Excel) {
+          console.log("✅ Excel file is ready!");
+          return res.data.base64Excel;
+        }
+      } catch (err) {
+        console.log("⏳ Still processing...");
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+
+    throw new Error("❌ Step Function timed out or failed.");
+  };
+
   const handleUpload = async () => {
     if (!file) return;
     setLoading(true);
-  
+
     try {
       const base64 = await fileToBase64(file);
-      console.log("📤 Sending base64 JSON to Lambda...");
-  
+      console.log("📤 Sending base64 to Lambda...");
+
       const response = await axios.post(
         'https://inordedh6h.execute-api.ap-south-1.amazonaws.com/Prod/start',
-        JSON.stringify({ pdf: base64 }),
+        { pdf: base64 },
         {
           headers: {
-            'Content-Type': 'application/json',
-          },
-          responseType: 'text', // 🔄 important: we expect base64 string, not blob!
+            'Content-Type': 'application/json'
+          }
         }
       );
-  
-      console.log("✅ Received base64 string from Lambda:", response.data);
-  
+
+      const executionArn = response.data.executionArn;
+      console.log("▶️ Step Function started:", executionArn);
+
+      const base64Excel = await pollForResult(executionArn);
+
       // Convert base64 → binary → Blob
-      const byteCharacters = atob(response.data); // decode base64
+      const byteCharacters = atob(base64Excel);
       const byteNumbers = new Array(byteCharacters.length).fill().map((_, i) => byteCharacters.charCodeAt(i));
       const byteArray = new Uint8Array(byteNumbers);
-  
+
       const blob = new Blob([byteArray], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
-  
+
       const url = window.URL.createObjectURL(blob);
       setDownloadLink(url);
     } catch (error) {
       console.error("❌ Upload failed:", error);
-      alert('⚠️ Upload failed. Check browser console for details.');
+      alert('⚠️ Upload failed. Check console for details.');
     }
-  
+
     setLoading(false);
   };
-  
 
   return (
     <Box sx={{ maxWidth: 700, mx: 'auto', p: 2 }}>
