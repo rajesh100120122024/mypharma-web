@@ -38,15 +38,16 @@ function PdfUploader() {
       try {
         const res = await axios.get(endpoint, {
           params: { executionArn },
-        });     
-        const base64Excel = res.data?.excelResult?.base64Excel;
+        });   
+        console.log("✅ res", res);  
+        const base64Excel = res.data?.base64Excel;
         console.log("✅ base64Excel", base64Excel);
           if (base64Excel) {
             console.log("✅ Excel file ready");
             return base64Excel;
           }
       } catch (err) {
-        console.log("⏳ Still processing or failed:", err.message);;
+        console.log("⏳ Still processing or failed:", err.message);
       }
 
       await new Promise((resolve) => setTimeout(resolve, interval));
