@@ -30,7 +30,7 @@ function PdfUploader() {
     });
   };
 
-  const pollForResult = async (executionArn, retries = 20, interval = 5000) => {
+  const pollForResult = async (executionArn, retries = 15, interval = 10000) => {
     for (let i = 0; i < retries; i++) {
       console.log(`🔄 Polling attempt ${i + 1}...`);
       const endpoint = "https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod";
