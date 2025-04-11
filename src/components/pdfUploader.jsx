@@ -40,7 +40,7 @@ function PdfUploader() {
         console.log("✅ base64Excel", base64Excel);
           if (base64Excel) {
             console.log("✅ Excel file ready");
-            return body.base64Excel;
+            return base64Excel;
           }
       } catch (err) {
         console.log("⏳ Still processing or failed:", err.message);;
