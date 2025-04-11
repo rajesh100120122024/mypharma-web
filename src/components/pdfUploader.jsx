@@ -34,7 +34,6 @@ function PdfUploader() {
     for (let i = 0; i < retries; i++) {
       console.log(`🔄 Polling attempt ${i + 1}...`);
       console.log(encodeURIComponent(executionArn));
-      encodeURIComponent(executionArn)
       try {
         const res = await axios.get(`https://o3su4z355d.execute-api.ap-south-1.amazonaws.com/Prod/result?executionArn=${encodeURIComponent(executionArn)}`);
         // Parse properly
