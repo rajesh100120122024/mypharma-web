@@ -30,9 +30,11 @@ function PdfUploader() {
     });
   };
 
-  const pollForResult = async (executionArn, retries = 20, interval = 5000) => {
+  const pollForResult = async (executionArn, retries = 5, interval = 5000) => {
     for (let i = 0; i < retries; i++) {
       console.log(`🔄 Polling attempt ${i + 1}...`);
+      console.log(encodeURIComponent(executionArn));
+      encodeURIComponent(executionArn)
       try {
         const res = await axios.get(`https://o3su4z355d.execute-api.ap-south-1.amazonaws.com/Prod/result?executionArn=${encodeURIComponent(executionArn)}`);
         // Parse properly
