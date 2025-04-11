@@ -33,10 +33,12 @@ function PdfUploader() {
   const pollForResult = async (executionArn, retries = 5, interval = 5000) => {
     for (let i = 0; i < retries; i++) {
       console.log(`🔄 Polling attempt ${i + 1}...`);
+      const endpoint = "https://o3su4z355d.execute-api.ap-south-1.amazonaws.com/Prod/result";
       console.log(encodeURIComponent(executionArn));
       try {
-        const res = await axios.get(`https://o3su4z355d.execute-api.ap-south-1.amazonaws.com/Prod/result?executionArn=${encodeURIComponent(executionArn)}`);
-        // Parse properly
+        const res = await axios.get(endpoint, {
+          params: { executionArn },
+        });     
         const base64Excel = res.data?.excelResult?.base64Excel;
         console.log("✅ base64Excel", base64Excel);
           if (base64Excel) {
