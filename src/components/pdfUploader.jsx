@@ -34,7 +34,7 @@ function PdfUploader() {
     for (let i = 0; i < retries; i++) {
       console.log(`🔄 Polling attempt ${i + 1}...`);
       try {
-        const res = await axios.get(`https://your-api-url.com/result?executionArn=${encodeURIComponent(executionArn)}`);
+        const res = await axios.get(`https://o3su4z355d.execute-api.ap-south-1.amazonaws.com/Prod/result?executionArn=${encodeURIComponent(executionArn)}`);
         // Parse properly
         const base64Excel = res.data?.excelResult?.base64Excel;
         console.log("✅ base64Excel", base64Excel);
