@@ -1,30 +1,47 @@
 import React, { useState } from 'react';
-import { Container, Tabs, Tab, Box } from '@mui/material';
-import ChatBox from './components/chatBox';
+import { Box, Typography, List, ListItem, ListItemText, Divider } from '@mui/material';
 import PdfUploader from './components/pdfUploader';
+import ChatBox from './components/chatBox';
 
 function App() {
-  const [tabIndex, setTabIndex] = useState(0);
+  const [selectedTab, setSelectedTab] = useState('PDF Uploader');
+
+  const renderContent = () => {
+    switch (selectedTab) {
+      case 'PDF Uploader':
+        return <PdfUploader />;
+      case 'Chat with Assistant':
+        return <ChatBox />;
+      default:
+        return <Typography variant="h6">Coming Soon</Typography>;
+    }
+  };
 
   return (
-    <Container maxWidth="md" sx={{ pt: 4 }}>
-      <Box sx={{ mb: 3 }}>
-        <Tabs
-          value={tabIndex}
-          onChange={(e, newIndex) => setTabIndex(newIndex)}
-          centered
-          variant="fullWidth"
-        >
-          <Tab label="💬 Chat with Assistant" />
-          <Tab label="📄 PDF to Excel" />
-        </Tabs>
+    <Box sx={{ display: 'flex', height: '100vh' }}>
+      {/* Sidebar */}
+      <Box sx={{ width: 240, bgcolor: '#1976d2', color: '#fff', p: 2 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>Health Stack</Typography>
+        <List>
+          {['PDF Uploader', 'Chat with Assistant', 'Settings'].map((text) => (
+            <ListItem
+              button
+              key={text}
+              selected={selectedTab === text}
+              onClick={() => setSelectedTab(text)}
+              sx={{ color: '#fff' }}
+            >
+              <ListItemText primary={text} />
+            </ListItem>
+          ))}
+        </List>
       </Box>
 
-      <Box>
-        {tabIndex === 0 && <ChatBox />}
-        {tabIndex === 1 && <PdfUploader />}
+      {/* Main Content */}
+      <Box sx={{ flexGrow: 1, p: 3 }}>
+        {renderContent()}
       </Box>
-    </Container>
+    </Box>
   );
 }
 
