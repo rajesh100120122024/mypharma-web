@@ -1,24 +1,30 @@
 import React, { useState } from 'react';
 import {
   Box,
-  Button,
   Typography,
+  Button,
   Paper,
   CircularProgress,
-  Stack
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow
 } from '@mui/material';
+import { CloudUpload, Download } from '@mui/icons-material';
 import axios from 'axios';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import DownloadIcon from '@mui/icons-material/Download';
 
 function PdfUploader() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [downloadLink, setDownloadLink] = useState(null);
+  const [uploaded, setUploaded] = useState(false);
 
   const handleFileChange = (event) => {
     setFile(event.target.files[0]);
     setDownloadLink(null);
+    setUploaded(false);
   };
 
   const fileToBase64 = (file) => {
@@ -32,11 +38,11 @@ function PdfUploader() {
 
   const pollForResult = async (executionArn, retries = 15, interval = 10000) => {
     for (let i = 0; i < retries; i++) {
-      console.log(`🔄 Polling attempt ${i + 1}...`);
       try {
         const res = await axios.get("https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod", {
           params: { executionArn },
         });
+
         const base64Excel = res.data?.base64Excel;
         if (base64Excel) {
           return base64Excel;
@@ -52,6 +58,7 @@ function PdfUploader() {
   const handleUpload = async () => {
     if (!file) return;
     setLoading(true);
+
     try {
       const base64 = await fileToBase64(file);
       const response = await axios.post(
@@ -61,76 +68,93 @@ function PdfUploader() {
           headers: { 'Content-Type': 'application/json' }
         }
       );
+
       const executionArn = response.data.executionArn;
       const base64Excel = await pollForResult(executionArn);
+
       const byteCharacters = atob(base64Excel);
-      const byteArray = new Uint8Array([...byteCharacters].map(char => char.charCodeAt(0)));
-      const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const byteNumbers = Array.from(byteCharacters, (char) => char.charCodeAt(0));
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+
       const url = window.URL.createObjectURL(blob);
       setDownloadLink(url);
+      setUploaded(true);
     } catch (error) {
       console.error("❌ Upload failed:", error);
-      alert('⚠️ Upload failed. Check console for details.');
+      alert("Upload failed. Check console for details.");
     }
+
     setLoading(false);
   };
 
   return (
-    <Box sx={{ maxWidth: 600, mx: 'auto', p: 4, border: '1px solid #ddd', borderRadius: 4, bgcolor: '#f5faff' }}>
-      <Typography variant="h4" fontWeight="bold" mb={3}>
+    <Box sx={{ maxWidth: 800, mx: 'auto', p: 3, borderRadius: 4 }}>
+      <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, fontSize: '1.6rem' }}>
         PDF Uploader
       </Typography>
 
-      <Paper
-        elevation={0}
-        sx={{
-          p: 4,
-          border: '2px dashed #90caf9',
-          borderRadius: '12px',
-          textAlign: 'center',
-          mb: 3,
-          bgcolor: '#fff'
-        }}
-      >
-        <CloudUploadIcon sx={{ fontSize: 60, color: '#2e7d32', mb: 2 }} />
-        <Typography variant="body1" mb={2}>
+      <Paper elevation={3} sx={{
+        p: 4,
+        mb: 4,
+        textAlign: 'center',
+        border: '2px dashed #90caf9',
+        borderRadius: 3,
+        bgcolor: '#f7fbff'
+      }}>
+        <CloudUpload sx={{ fontSize: 48, color: '#2e7d32', mb: 1 }} />
+        <Typography variant="subtitle1" mb={2}>
           Drag and drop a PDF file here, or click to browse
         </Typography>
-        <input type="file" accept="application/pdf" onChange={handleFileChange} />
-      </Paper>
 
-      <Box textAlign="center" mb={3}>
+        <input
+          type="file"
+          onChange={handleFileChange}
+          accept="application/pdf"
+          style={{ marginBottom: '16px' }}
+        />
+
         <Button
           variant="contained"
-          color="success"
-          startIcon={<CloudUploadIcon />}
-          disabled={!file || loading}
+          startIcon={<CloudUpload />}
           onClick={handleUpload}
+          disabled={!file || loading}
           sx={{
-            px: 5,
+            bgcolor: '#2e7d32',
+            borderRadius: '30px',
+            px: 4,
             py: 1.2,
+            mt: 1,
             fontWeight: 'bold',
-            borderRadius: 3,
-            boxShadow: 3
+            '&:hover': {
+              bgcolor: '#1b5e20'
+            }
           }}
         >
-          {loading ? <CircularProgress size={22} color="inherit" /> : 'UPLOAD'}
+          {loading ? <CircularProgress size={22} color="inherit" /> : "UPLOAD"}
         </Button>
-      </Box>
+      </Paper>
 
-      {downloadLink && (
-        <Box textAlign="center">
+      {uploaded && (
+        <Box sx={{ textAlign: 'center' }}>
           <Button
             variant="outlined"
-            color="primary"
-            startIcon={<DownloadIcon />}
+            startIcon={<Download />}
             href={downloadLink}
             download="output.xlsx"
             sx={{
+              borderRadius: '24px',
+              fontWeight: 'bold',
               px: 4,
-              py: 1.2,
-              borderRadius: '25px',
-              fontWeight: 'bold'
+              py: 1.5,
+              fontSize: '1rem',
+              borderColor: '#00796b',
+              color: '#00796b',
+              '&:hover': {
+                bgcolor: '#e0f2f1'
+              }
             }}
           >
             DOWNLOAD EXCEL
