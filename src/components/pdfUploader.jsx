@@ -6,13 +6,7 @@ import {
   Paper,
   Input,
   CircularProgress,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow
+  Stack
 } from '@mui/material';
 import axios from 'axios';
 import { CloudUpload as UploadIcon, Download as DownloadIcon } from '@mui/icons-material';
@@ -40,109 +34,129 @@ function PdfUploader() {
     for (let i = 0; i < retries; i++) {
       console.log(`🔄 Polling attempt ${i + 1}...`);
       const endpoint = "https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod";
+      console.log(encodeURIComponent(executionArn));
       try {
-        const res = await axios.get(endpoint, { params: { executionArn } });
+        const res = await axios.get(endpoint, {
+          params: { executionArn },
+        });
+        console.log("✅ res", res);
         const base64Excel = res.data?.base64Excel;
-        if (base64Excel) return base64Excel;
+        console.log("✅ base64Excel", base64Excel);
+        if (base64Excel) {
+          console.log("✅ Excel file ready");
+          return base64Excel;
+        }
       } catch (err) {
         console.log("⏳ Still processing or failed:", err.message);
       }
+
       await new Promise((resolve) => setTimeout(resolve, interval));
     }
+
     throw new Error("❌ Step Function timed out or failed.");
   };
 
   const handleUpload = async () => {
     if (!file) return;
     setLoading(true);
+
     try {
       const base64 = await fileToBase64(file);
+      console.log("📤 Sending base64 to Lambda...");
+
       const response = await axios.post(
         'https://inordedh6h.execute-api.ap-south-1.amazonaws.com/Prod/start',
         { pdf: base64 },
-        { headers: { 'Content-Type': 'application/json' } }
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       );
+
       const executionArn = response.data.executionArn;
+      console.log("▶️ Step Function started:", executionArn);
+
       const base64Excel = await pollForResult(executionArn);
 
-      const byteArray = new Uint8Array([...atob(base64Excel)].map(c => c.charCodeAt(0)));
+      const byteCharacters = atob(base64Excel);
+      const byteNumbers = new Array(byteCharacters.length).fill().map((_, i) => byteCharacters.charCodeAt(i));
+      const byteArray = new Uint8Array(byteNumbers);
+
       const blob = new Blob([byteArray], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
+
       const url = window.URL.createObjectURL(blob);
       setDownloadLink(url);
     } catch (error) {
       console.error("❌ Upload failed:", error);
       alert('⚠️ Upload failed. Check console for details.');
     }
+
     setLoading(false);
   };
 
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', mt: 4, border: '2px solid #ccc', borderRadius: 3, p: 4 }}>
-      <Typography variant="h4" gutterBottom fontWeight="bold">
+    <Box sx={{ maxWidth: 650, mx: 'auto', mt: 4, p: 3, border: '1px solid #ccc', borderRadius: 3, backgroundColor: '#f9fcff' }}>
+      <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>
         PDF Uploader
       </Typography>
 
-      <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', border: '2px dashed #90caf9', mb: 3 }}>
-        <UploadIcon sx={{ fontSize: 60, color: '#2e7d32' }} />
-        <Typography variant="body1" mt={2}>
+      <Paper variant="outlined" sx={{
+        p: 2,
+        textAlign: 'center',
+        border: '2px dashed #90caf9',
+        mb: 3,
+        borderRadius: 2,
+        maxWidth: '100%',
+        mx: 'auto'
+      }}>
+        <UploadIcon sx={{ fontSize: 40, color: '#2e7d32' }} />
+        <Typography variant="body1" mt={1}>
           Drag and drop a PDF file here, or click to browse
         </Typography>
-        <Input type="file" onChange={handleFileChange} fullWidth disableUnderline sx={{ mt: 2 }} />
+        <Input
+          type="file"
+          onChange={handleFileChange}
+          disableUnderline
+          sx={{ mt: 1, fontSize: 14 }}
+        />
       </Paper>
 
       <Box textAlign="center" mb={4}>
         <Button
           variant="contained"
-          size="large"
-          sx={{ px: 5, py: 1.5, bgcolor: '#2e7d32' }}
+          size="medium"
+          sx={{
+            px: 4,
+            py: 1,
+            bgcolor: '#2e7d32',
+            fontSize: 14,
+            borderRadius: 2,
+            textTransform: 'uppercase'
+          }}
           startIcon={<UploadIcon />}
           disabled={!file || loading}
           onClick={handleUpload}
         >
-          {loading ? <CircularProgress size={24} color="inherit" /> : 'Upload'}
+          {loading ? <CircularProgress size={20} color="inherit" /> : 'Upload'}
         </Button>
       </Box>
 
-      {/* Result table */}
-      <TableContainer component={Paper} elevation={1}>
-        <Table>
-          <TableHead>
-            <TableRow sx={{ backgroundColor: '#f0f0f0' }}>
-              <TableCell><strong>Filename</strong></TableCell>
-              <TableCell><strong>Status</strong></TableCell>
-              <TableCell><strong>Download</strong></TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            <TableRow>
-              <TableCell>{file?.name || 'report1.pdf'}</TableCell>
-              <TableCell>
-                {loading ? (
-                  <Box sx={{ color: 'orange', fontWeight: 'bold' }}>Processing</Box>
-                ) : downloadLink ? (
-                  <Box sx={{ color: 'green', fontWeight: 'bold' }}>Complete</Box>
-                ) : (
-                  '-'
-                )}
-              </TableCell>
-              <TableCell>
-                {downloadLink && (
-                  <Button
-                    variant="contained"
-                    href={downloadLink}
-                    download="output.xlsx"
-                    sx={{ bgcolor: '#1976d2' }}
-                  >
-                    Download
-                  </Button>
-                )}
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </TableContainer>
+      {downloadLink && (
+        <Box textAlign="center">
+          <Button
+            variant="outlined"
+            color="primary"
+            startIcon={<DownloadIcon />}
+            href={downloadLink}
+            download="output.xlsx"
+          >
+            📥 Download Excel
+          </Button>
+        </Box>
+      )}
     </Box>
   );
 }
