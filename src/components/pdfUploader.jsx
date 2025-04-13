@@ -70,13 +70,18 @@ function PdfUploader() {
           headers: { 'Content-Type': 'application/json' }
         }
       );
-
+      console.log("⏳ 1");
       const executionArn = response.data.executionArn;
+      console.log("⏳ 2");
       const base64Excel = await pollForResult(executionArn);
+      console.log("⏳ 3");
 
       const byteCharacters = atob(base64Excel);
+      console.log("⏳ 4");
       const byteNumbers = Array.from(byteCharacters, (char) => char.charCodeAt(0));
+      console.log("⏳ 5");
       const byteArray = new Uint8Array(byteNumbers);
+      console.log("⏳ 6");
       const blob = new Blob([byteArray], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
