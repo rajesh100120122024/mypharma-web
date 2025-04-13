@@ -6,7 +6,11 @@ import {
   Paper,
   Input,
   CircularProgress,
-  Stack
+  Stack,
+  List,
+  ListItem,
+  ListItemText,
+  Divider
 } from '@mui/material';
 import axios from 'axios';
 import { CloudUpload as UploadIcon, Download as DownloadIcon } from '@mui/icons-material';
@@ -24,13 +28,13 @@ function PdfUploader() {
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]); // remove base64 prefix
+      reader.onload = () => resolve(reader.result.split(',')[1]);
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
   };
 
-  const pollForResult = async (executionArn, retries = 15, interval = 10000) => {
+  const pollForResult = async (executionArn, retries = 20, interval = 5000) => {
     for (let i = 0; i < retries; i++) {
       console.log(`🔄 Polling attempt ${i + 1}...`);
       const endpoint = "https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod";
@@ -40,7 +44,7 @@ function PdfUploader() {
           params: { executionArn },
         });   
         console.log("✅ res", res);  
-        const base64Excel = res.data?.base64Excel;
+        const base64Excel = res.data?.excelResult?.base64Excel;
         console.log("✅ base64Excel", base64Excel);
           if (base64Excel) {
             console.log("✅ Excel file ready");
@@ -79,7 +83,6 @@ function PdfUploader() {
 
       const base64Excel = await pollForResult(executionArn);
 
-      // Convert base64 → binary → Blob
       const byteCharacters = atob(base64Excel);
       const byteNumbers = new Array(byteCharacters.length).fill().map((_, i) => byteCharacters.charCodeAt(i));
       const byteArray = new Uint8Array(byteNumbers);
@@ -99,31 +102,41 @@ function PdfUploader() {
   };
 
   return (
-    <Box sx={{ maxWidth: 700, mx: 'auto', p: 2 }}>
-      <Typography variant="h5" color="secondary" gutterBottom>
-        📄 Upload Prescription PDF
-      </Typography>
+    <Box sx={{ display: 'flex', height: '100vh' }}>
+      <Box sx={{ width: 240, bgcolor: '#1976d2', color: '#fff', p: 2 }}>
+        <Typography variant="h6" gutterBottom>Health Stack</Typography>
+        <List>
+          <ListItem selected>
+            <ListItemText primary="📤 PDF Uploader" />
+          </ListItem>
+          <ListItem>
+            <ListItemText primary="💬 Chat with Assistant" />
+          </ListItem>
+          <ListItem>
+            <ListItemText primary="⚙️ Settings" />
+          </ListItem>
+        </List>
+      </Box>
 
-      <Paper elevation={4} sx={{ p: 3, bgcolor: '#fff3e0' }}>
-        <Stack spacing={2}>
-          <Input
-            type="file"
-            onChange={handleFileChange}
-            fullWidth
-            sx={{ bgcolor: 'white', p: 1 }}
-          />
+      <Box sx={{ flexGrow: 1, p: 4 }}>
+        <Typography variant="h5" gutterBottom>PDF Uploader</Typography>
 
+        <Paper elevation={3} sx={{ p: 4, mb: 4, textAlign: 'center' }}>
+          <Input type="file" onChange={handleFileChange} fullWidth sx={{ mb: 2 }} />
           <Button
             variant="contained"
             startIcon={<UploadIcon />}
             disabled={!file || loading}
             onClick={handleUpload}
-            color="secondary"
+            color="primary"
           >
-            {loading ? <CircularProgress size={20} /> : 'Upload & Convert'}
+            {loading ? <CircularProgress size={20} /> : 'Upload'}
           </Button>
+        </Paper>
 
-          {downloadLink && (
+        {downloadLink && (
+          <Box>
+            <Typography variant="h6" gutterBottom>Downloads</Typography>
             <Button
               variant="outlined"
               color="primary"
@@ -133,9 +146,9 @@ function PdfUploader() {
             >
               📥 Download Excel
             </Button>
-          )}
-        </Stack>
-      </Paper>
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 }
