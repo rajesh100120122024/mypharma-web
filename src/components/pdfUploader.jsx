@@ -109,12 +109,13 @@ function PdfUploader() {
           Drag and drop a PDF file here, or click to browse
         </Typography>
 
-        <input
-          type="file"
-          onChange={handleFileChange}
-          accept="application/pdf"
-          style={{ marginBottom: '16px' }}
-        />
+        <Input
+  type="file"
+  accept="application/pdf"
+  onChange={handleFileChange}
+  sx={{ mb: 2 }}
+  inputProps={{ 'aria-label': 'Upload PDF' }}
+/>
 
         <Button
           variant="contained"
