@@ -55,7 +55,7 @@ function PdfUploader() {
       console.log("📤 Sending base64 to Lambda...");
 
       const response = await fetch(
-        'https://inordedh6h.execute-api.ap-south-1.amazonaws.com/Prod/start',
+        'https://xyz.execute-api.ap-south-1.amazonaws.com/Prod/start',
         {
           method: 'POST',
           headers: {
@@ -91,7 +91,7 @@ function PdfUploader() {
     for (let i = 0; i < retries; i++) {
       console.log(`🔄 Polling attempt ${i + 1}...`);
       try {
-        const endpoint = "https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod";
+        const endpoint = "https://xxx.execute-api.ap-south-1.amazonaws.com/prod";
         const res = await fetch(`${endpoint}?executionArn=${encodeURIComponent(executionArn)}`);
         const data = await res.json();
         
