@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Typography,
+  Paper,
   Input,
   CircularProgress,
   Stack
@@ -23,7 +24,7 @@ function PdfUploader() {
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onload = () => resolve(reader.result.split(',')[1]); // remove base64 prefix
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
@@ -33,38 +34,54 @@ function PdfUploader() {
     for (let i = 0; i < retries; i++) {
       console.log(`🔄 Polling attempt ${i + 1}...`);
       const endpoint = "https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod";
+      console.log(encodeURIComponent(executionArn));
       try {
         const res = await axios.get(endpoint, {
           params: { executionArn },
         });
+        console.log("✅ res", res);
         const base64Excel = res.data?.base64Excel;
+        console.log("✅ base64Excel", base64Excel);
         if (base64Excel) {
+          console.log("✅ Excel file ready");
           return base64Excel;
         }
       } catch (err) {
         console.log("⏳ Still processing or failed:", err.message);
       }
+
       await new Promise((resolve) => setTimeout(resolve, interval));
     }
+
     throw new Error("❌ Step Function timed out or failed.");
   };
 
   const handleUpload = async () => {
     if (!file) return;
     setLoading(true);
+
     try {
       const base64 = await fileToBase64(file);
+      console.log("📤 Sending base64 to Lambda...");
+
       const response = await axios.post(
         'https://inordedh6h.execute-api.ap-south-1.amazonaws.com/Prod/start',
         { pdf: base64 },
-        { headers: { 'Content-Type': 'application/json' } }
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       );
 
       const executionArn = response.data.executionArn;
+      console.log("▶️ Step Function started:", executionArn);
+
       const base64Excel = await pollForResult(executionArn);
 
       const byteCharacters = atob(base64Excel);
-      const byteArray = new Uint8Array([...byteCharacters].map(c => c.charCodeAt(0)));
+      const byteNumbers = new Array(byteCharacters.length).fill().map((_, i) => byteCharacters.charCodeAt(i));
+      const byteArray = new Uint8Array(byteNumbers);
 
       const blob = new Blob([byteArray], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -76,72 +93,67 @@ function PdfUploader() {
       console.error("❌ Upload failed:", error);
       alert('⚠️ Upload failed. Check console for details.');
     }
+
     setLoading(false);
   };
 
   return (
-    <Box sx={{ maxWidth: 700, mx: 'auto', p: 4 }}>
-      <Typography variant="h4" fontWeight="bold" mb={3}>
+    <Box sx={{ maxWidth: 650, mx: 'auto', mt: 4, p: 3, border: '1px solid #ccc', borderRadius: 3, backgroundColor: '#f9fcff' }}>
+      <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>
         PDF Uploader
       </Typography>
 
-      <Box
-        sx={{
-          border: '2px dashed #90caf9',
-          borderRadius: '16px',
-          p: 4,
-          textAlign: 'center',
-          mb: 3
-        }}
-      >
-        <img
-          src="https://cdn-icons-png.flaticon.com/512/724/724933.png"
-          alt="Upload"
-          style={{ width: 60, marginBottom: 16 }}
-        />
-        <Typography variant="body1" mb={2}>
+      <Paper variant="outlined" sx={{
+        p: 2,
+        textAlign: 'center',
+        border: '2px dashed #90caf9',
+        mb: 3,
+        borderRadius: 2,
+        maxWidth: '100%',
+        mx: 'auto'
+      }}>
+        <UploadIcon sx={{ fontSize: 40, color: '#2e7d32' }} />
+        <Typography variant="body1" mt={1}>
           Drag and drop a PDF file here, or click to browse
         </Typography>
-        <Input type="file" onChange={handleFileChange} />
+        <Input
+          type="file"
+          onChange={handleFileChange}
+          disableUnderline
+          sx={{ mt: 1, fontSize: 14 }}
+        />
+      </Paper>
+
+      <Box textAlign="center" mb={4}>
+        <Button
+          variant="contained"
+          size="medium"
+          sx={{
+            px: 4,
+            py: 1,
+            bgcolor: '#2e7d32',
+            fontSize: 14,
+            borderRadius: 2,
+            textTransform: 'uppercase'
+          }}
+          startIcon={<UploadIcon />}
+          disabled={!file || loading}
+          onClick={handleUpload}
+        >
+          {loading ? <CircularProgress size={20} color="inherit" /> : 'Upload'}
+        </Button>
       </Box>
 
-      <Button
-        variant="contained"
-        onClick={handleUpload}
-        disabled={!file || loading}
-        startIcon={<UploadIcon />}
-        sx={{
-          backgroundColor: '#2e7d32',
-          borderRadius: '30px',
-          px: 5,
-          py: 1.5,
-          fontWeight: 'bold',
-          boxShadow: 3,
-          '&:hover': {
-            backgroundColor: '#1b5e20'
-          }
-        }}
-      >
-        {loading ? <CircularProgress size={20} /> : 'UPLOAD'}
-      </Button>
-
       {downloadLink && (
-        <Box sx={{ mt: 4, textAlign: 'center' }}>
+        <Box textAlign="center">
           <Button
             variant="outlined"
+            color="primary"
             startIcon={<DownloadIcon />}
             href={downloadLink}
             download="output.xlsx"
-            sx={{
-              borderRadius: '20px',
-              px: 4,
-              py: 1.2,
-              color: '#00695c',
-              borderColor: '#00695c',
-              fontWeight: 'bold'
-            }}
           >
-            📥 DOWNLOAD EXCEL
+            📥 Download Excel
           </Button>
         </Box>
       )}
