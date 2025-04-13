@@ -30,12 +30,17 @@ function App() {
         p: 2,
         boxShadow: 3
       }}>
-        <Typography
-          variant="h6"
-          sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}
-        >
-          📘 Health Stack
-        </Typography>
+<Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+  <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+    <Box sx={{ width: 20, height: 4, bgcolor: '#fff', borderRadius: 1 }} />
+    <Box sx={{ width: 20, height: 4, bgcolor: '#fff', borderRadius: 1 }} />
+    <Box sx={{ width: 20, height: 4, bgcolor: '#fff', borderRadius: 1 }} />
+  </Box>
+  <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+    Health Stack
+  </Typography>
+</Box>
+
 
         <List>
           {['PDF Uploader', 'Chat with Assistant', 'Settings'].map((text) => (
