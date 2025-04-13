@@ -44,12 +44,12 @@ function PdfUploader() {
           params: { executionArn },
         });   
         console.log("✅ res", res);  
-        const base64Excel = res.data?.excelResult?.base64Excel;
+        const base64Excel = res.data?.base64Excel;
         console.log("✅ base64Excel", base64Excel);
-          if (base64Excel) {
-            console.log("✅ Excel file ready");
-            return base64Excel;
-          }
+        if (base64Excel) {
+          console.log("✅ Excel file ready");
+          return base64Excel;
+        }
       } catch (err) {
         console.log("⏳ Still processing or failed:", err.message);
       }
@@ -122,6 +122,18 @@ function PdfUploader() {
         <Typography variant="h5" gutterBottom>PDF Uploader</Typography>
 
         <Paper elevation={3} sx={{ p: 4, mb: 4, textAlign: 'center' }}>
+          <Box
+            sx={{
+              border: '2px dashed #1976d2',
+              p: 4,
+              mb: 2,
+              borderRadius: 2,
+              bgcolor: '#f9f9f9'
+            }}
+          >
+            <Typography>📤 Drag and drop a PDF file here, or click to browse</Typography>
+          </Box>
+
           <Input type="file" onChange={handleFileChange} fullWidth sx={{ mb: 2 }} />
           <Button
             variant="contained"
