@@ -86,7 +86,7 @@ function PdfUploader() {
         path: "/start",
         options: {
           body: {
-            s3Bucket: 'bucket', // Your bucket name
+            s3Bucket: 'pdf-upload-bucket-mypharma', // Your bucket name
             s3Key: fileName
           }
         }
