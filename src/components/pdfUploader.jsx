@@ -10,7 +10,8 @@ import {
   Alert
 } from '@mui/material';
 import { CloudUpload, Download } from '@mui/icons-material';
-import { Storage, API } from 'aws-amplify';
+import { uploadData, getUrl } from 'aws-amplify/storage';
+import { post, get } from 'aws-amplify/api';
 import '../amplify'; // Import your Amplify config
 
 function PdfUploader() {
@@ -32,11 +33,15 @@ function PdfUploader() {
   const pollForResult = async (executionArn, retries = 15, interval = 10000) => {
     for (let i = 0; i < retries; i++) {
       try {
-        const res = await API.get("stepFunctions", "/", {
-          queryStringParameters: { executionArn }
+        const res = await get({
+          apiName: "stepFunctions",
+          path: "/",
+          options: {
+            queryParams: { executionArn }
+          }
         });
 
-        const base64Excel = res?.base64Excel;
+        const base64Excel = res.body?.base64Excel;
         if (base64Excel) {
           return base64Excel;
         }
@@ -60,26 +65,34 @@ function PdfUploader() {
       const fileName = `uploads/${Date.now()}-${file.name}`;
       
       // Upload with progress tracking
-      await Storage.put(fileName, file, {
-        contentType: 'application/pdf',
-        progressCallback(progress) {
-          const percentUploaded = Math.round((progress.loaded / progress.total) * 100);
-          setProgress(percentUploaded);
-          console.log(`Upload progress: ${percentUploaded}%`);
-        },
+      await uploadData({
+        key: fileName,
+        data: file,
+        options: {
+          contentType: 'application/pdf',
+          onProgress: (progress) => {
+            const percentUploaded = Math.round((progress.loaded / progress.total) * 100);
+            setProgress(percentUploaded);
+            console.log(`Upload progress: ${percentUploaded}%`);
+          }
+        }
       });
       
       console.log("Upload complete, calling Lambda...");
       
       // Start processing with Lambda
-      const response = await API.post("pdfProcessor", "/start", {
-        body: {
-          s3Bucket: 'bucket', // Your bucket name
-          s3Key: fileName
+      const response = await post({
+        apiName: "pdfProcessor",
+        path: "/start",
+        options: {
+          body: {
+            s3Bucket: 'bucket', // Your bucket name
+            s3Key: fileName
+          }
         }
       });
       
-      const executionArn = response.executionArn;
+      const executionArn = response.body.executionArn;
       console.log("Step function execution started:", executionArn);
       
       // Poll for results

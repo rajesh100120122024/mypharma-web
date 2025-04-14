@@ -7,24 +7,20 @@ Amplify.configure({
     region: 'ap-south-1',
   },
   Storage: {
-    AWSS3: {
-      bucket: 'pdf-upload-bucket-mypharma', // Your bucket name
-      region: 'ap-south-1',
-    }
+    bucket: 'pdf-upload-bucket-mypharma', // Your bucket name
+    region: 'ap-south-1',
   },
   API: {
-    endpoints: [
-      {
-        name: "pdfProcessor",
+    REST: {
+      pdfProcessor: {
         endpoint: "https://inordedh6h.execute-api.ap-south-1.amazonaws.com/Prod/start",
         region: "ap-south-1"
       },
-      {
-        name: "stepFunctions",
+      stepFunctions: {
         endpoint: "https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod",
         region: "ap-south-1"
       }
-    ]
+    }
   }
 });
 
