@@ -1,19 +1,19 @@
 {
   "dev": {
     "awscloudformation": {
-      "AuthRoleName": "amplify-mypharmaamplify-dev-428c2-authRole",
-      "UnauthRoleArn": "arn:aws:iam::447236060429:role/amplify-mypharmaamplify-dev-428c2-unauthRole",
-      "AuthRoleArn": "arn:aws:iam::447236060429:role/amplify-mypharmaamplify-dev-428c2-authRole",
+      "AuthRoleName": "amplify-mypharmaweb-dev-7797b-authRole",
+      "UnauthRoleArn": "arn:aws:iam::447236060429:role/amplify-mypharmaweb-dev-7797b-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::447236060429:role/amplify-mypharmaweb-dev-7797b-authRole",
       "Region": "ap-south-1",
-      "DeploymentBucketName": "amplify-mypharmaamplify-dev-428c2-deployment",
-      "UnauthRoleName": "amplify-mypharmaamplify-dev-428c2-unauthRole",
-      "StackName": "amplify-mypharmaamplify-dev-428c2",
-      "StackId": "arn:aws:cloudformation:ap-south-1:447236060429:stack/amplify-mypharmaamplify-dev-428c2/465e3580-192c-11f0-8c49-0237420bea5b",
-      "AmplifyAppId": "d2377i1b51kufn"
+      "DeploymentBucketName": "amplify-mypharmaweb-dev-7797b-deployment",
+      "UnauthRoleName": "amplify-mypharmaweb-dev-7797b-unauthRole",
+      "StackName": "amplify-mypharmaweb-dev-7797b",
+      "StackId": "arn:aws:cloudformation:ap-south-1:447236060429:stack/amplify-mypharmaweb-dev-7797b/450c23f0-1935-11f0-91d1-0a162af71911",
+      "AmplifyAppId": "dcskociqts0yg"
     },
     "categories": {
       "auth": {
-        "mypharmaamplify75a4e4b7": {}
+        "mypharmaweb103e4a68": {}
       }
     }
   }

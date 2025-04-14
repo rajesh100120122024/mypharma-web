@@ -1,10 +1,10 @@
 {
   "version": "1",
   "cognitoConfig": {
-    "identityPoolName": "mypharmaamplify75a4e4b7_identitypool_75a4e4b7",
+    "identityPoolName": "mypharmaweb103e4a68_identitypool_103e4a68",
     "allowUnauthenticatedIdentities": false,
-    "resourceNameTruncated": "myphar75a4e4b7",
-    "userPoolName": "mypharmaamplify75a4e4b7_userpool_75a4e4b7",
+    "resourceNameTruncated": "myphar103e4a68",
+    "userPoolName": "mypharmaweb103e4a68_userpool_103e4a68",
     "autoVerifiedAttributes": [
       "email"
     ],
@@ -31,12 +31,15 @@
     "userpoolClientReadAttributes": [
       "email"
     ],
-    "userpoolClientLambdaRole": "myphar75a4e4b7_userpoolclient_lambda_role",
+    "userpoolClientLambdaRole": "myphar103e4a68_userpoolclient_lambda_role",
     "userpoolClientSetAttributes": false,
-    "sharedId": "75a4e4b7",
-    "resourceName": "mypharmaamplify75a4e4b7",
+    "sharedId": "103e4a68",
+    "resourceName": "mypharmaweb103e4a68",
     "authSelections": "identityPoolAndUserPool",
     "useDefault": "default",
+    "usernameAttributes": [
+      "email"
+    ],
     "userPoolGroupList": [],
     "serviceName": "Cognito",
     "usernameCaseSensitive": false,
