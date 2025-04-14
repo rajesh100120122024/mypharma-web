@@ -67,8 +67,9 @@ function PdfUploader() {
 
       // 🔐 Get current AWS credentials from Amplify
       const session = await fetchAuthSession();
+      console.log("🔍 Auth session:", session);
       const credentials = session.credentials;
-
+      console.log("🔍 credentials:", credentials);
       const s3Client = new S3Client({
         region: "ap-south-1",
         credentials: {
