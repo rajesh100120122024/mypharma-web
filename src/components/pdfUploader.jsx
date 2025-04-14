@@ -10,9 +10,11 @@ import {
   Alert
 } from '@mui/material';
 import { CloudUpload, Download } from '@mui/icons-material';
-import { uploadData } from 'aws-amplify/storage';
 import { post, get } from 'aws-amplify/api';
-import '../amplify'; // Your Amplify config file
+import { fetchAuthSession } from 'aws-amplify/auth';
+import { S3Client } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
+import '../amplify'; // Your Amplify configuration
 
 function PdfUploader() {
   const [file, setFile] = useState(null);
@@ -42,7 +44,9 @@ function PdfUploader() {
         });
 
         const base64Excel = res.body?.base64Excel;
-        if (base64Excel) return base64Excel;
+        if (base64Excel) {
+          return base64Excel;
+        }
       } catch (err) {
         console.log("⏳ Still processing or failed:", err.message);
       }
@@ -61,19 +65,40 @@ function PdfUploader() {
       console.log("📤 Uploading PDF to S3...");
       const fileName = `uploads/${Date.now()}-${file.name}`;
 
-      await uploadData({
-        key: fileName,
-        data: file,
-        options: {
-          contentType: 'application/pdf',
-          checksumAlgorithm: undefined, // ✅ fixes multipart upload error
-          onProgress: (progress) => {
-            const percentUploaded = Math.round((progress.loaded / progress.total) * 100);
-            setProgress(percentUploaded);
-            console.log(`Upload progress: ${percentUploaded}%`);
-          }
+      // 🔐 Get current AWS credentials from Amplify
+      const session = await fetchAuthSession();
+      console.log("🔍 Auth session:", session);
+      const credentials = session.credentials;
+      console.log("🔍 credentials:", credentials);
+      if (!credentials) {
+        throw new Error("❌ No AWS credentials available from Amplify Auth session.");
+      }
+      const s3Client = new S3Client({
+        region: "ap-south-1",
+        credentials: {
+          accessKeyId: credentials.accessKeyId,
+          secretAccessKey: credentials.secretAccessKey,
+          sessionToken: credentials.sessionToken
         }
       });
+
+      const upload = new Upload({
+        client: s3Client,
+        params: {
+          Bucket: "pdf-upload-bucket-mypharma",
+          Key: fileName,
+          Body: file,
+          ContentType: "application/pdf"
+        }
+      });
+
+      upload.on("httpUploadProgress", (progressEvent) => {
+        const percentUploaded = Math.round((progressEvent.loaded / progressEvent.total) * 100);
+        setProgress(percentUploaded);
+        console.log(`📶 Upload progress: ${percentUploaded}%`);
+      });
+
+      await upload.done();
 
       console.log("✅ Upload complete, calling Lambda...");
 
@@ -94,9 +119,8 @@ function PdfUploader() {
       const base64Excel = await pollForResult(executionArn);
 
       const byteCharacters = atob(base64Excel);
-      const byteArray = new Uint8Array(
-        Array.from(byteCharacters, char => char.charCodeAt(0))
-      );
+      const byteNumbers = Array.from(byteCharacters, (char) => char.charCodeAt(0));
+      const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
@@ -104,9 +128,10 @@ function PdfUploader() {
       const url = window.URL.createObjectURL(blob);
       setDownloadLink(url);
       setUploaded(true);
-    } catch (error) {
-      console.error("❌ Upload failed:", error);
-      setError("Upload failed: " + (error.message || "Please try again."));
+
+    } catch (err) {
+      console.error("❌ Upload failed:", err);
+      setError("Upload failed: " + (err.message || "Please try again."));
     }
 
     setLoading(false);
@@ -142,6 +167,7 @@ function PdfUploader() {
           accept="application/pdf"
           onChange={handleFileChange}
           sx={{ mb: 2 }}
+          inputProps={{ 'aria-label': 'Upload PDF' }}
         />
 
         <Button
@@ -169,23 +195,27 @@ function PdfUploader() {
             <Typography variant="body2" color="text.secondary">
               Upload progress: {progress}%
             </Typography>
-            <Box sx={{
-              height: 10,
-              bgcolor: '#e0e0e0',
-              borderRadius: 5,
-              mt: 1,
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              <Box sx={{
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                height: '100%',
-                bgcolor: '#2e7d32',
-                width: `${progress}%`,
-                transition: 'width 0.3s ease'
-              }} />
+            <Box
+              sx={{
+                height: 10,
+                bgcolor: '#e0e0e0',
+                borderRadius: 5,
+                mt: 1,
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+            >
+              <Box
+                sx={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  height: '100%',
+                  bgcolor: '#2e7d32',
+                  width: `${progress}%`,
+                  transition: 'width 0.3s ease'
+                }}
+              />
             </Box>
           </Box>
         )}
