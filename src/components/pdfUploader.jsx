@@ -14,6 +14,8 @@ import { post, get } from 'aws-amplify/api';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { S3Client } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
+import { post, get } from 'aws-amplify/api';
+import { uploadData } from 'aws-amplify/storage';
 import '../amplify'; // Your Amplify configuration
 
 function PdfUploader() {
