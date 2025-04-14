@@ -60,82 +60,67 @@ function PdfUploader() {
     setLoading(true);
     setError(null);
     setProgress(0);
-
+  
     try {
+      // Upload to S3 using Amplify Storage
       console.log("📤 Uploading PDF to S3...");
       const fileName = `uploads/${Date.now()}-${file.name}`;
-
-      // 🔐 Get current AWS credentials from Amplify
-      const session = await fetchAuthSession();
-      console.log("🔍 Auth session:", session);
-      const credentials = session.credentials;
-      console.log("🔍 credentials:", credentials);
-      if (!credentials) {
-        throw new Error("❌ No AWS credentials available from Amplify Auth session.");
-      }
-      const s3Client = new S3Client({
-        region: "ap-south-1",
-        credentials: {
-          accessKeyId: credentials.accessKeyId,
-          secretAccessKey: credentials.secretAccessKey,
-          sessionToken: credentials.sessionToken
+  
+      // Upload with progress tracking and checksum disabled
+      await uploadData({
+        key: fileName,
+        data: file,
+        options: {
+          contentType: 'application/pdf',
+          // ✅ Disable checksum to avoid multipart error
+          checksumAlgorithm: undefined,
+          onProgress: (progress) => {
+            const percentUploaded = Math.round((progress.loaded / progress.total) * 100);
+            setProgress(percentUploaded);
+            console.log(`Upload progress: ${percentUploaded}%`);
+          }
         }
       });
-
-      const upload = new Upload({
-        client: s3Client,
-        params: {
-          Bucket: "pdf-upload-bucket-mypharma",
-          Key: fileName,
-          Body: file,
-          ContentType: "application/pdf"
-        }
-      });
-
-      upload.on("httpUploadProgress", (progressEvent) => {
-        const percentUploaded = Math.round((progressEvent.loaded / progressEvent.total) * 100);
-        setProgress(percentUploaded);
-        console.log(`📶 Upload progress: ${percentUploaded}%`);
-      });
-
-      await upload.done();
-
+  
       console.log("✅ Upload complete, calling Lambda...");
-
+  
+      // Call Lambda to start Step Function
       const response = await post({
         apiName: "pdfProcessor",
         path: "/start",
         options: {
           body: {
-            s3Bucket: 'pdf-upload-bucket-mypharma',
+            s3Bucket: 'pdf-upload-bucket-mypharma', // Your actual bucket name
             s3Key: fileName
           }
         }
       });
-
+  
       const executionArn = response.body.executionArn;
       console.log("🚀 Step function execution started:", executionArn);
-
+  
+      // Poll for results
       const base64Excel = await pollForResult(executionArn);
-
+  
+      // Convert base64 to Blob and create download link
       const byteCharacters = atob(base64Excel);
       const byteNumbers = Array.from(byteCharacters, (char) => char.charCodeAt(0));
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
-
+  
       const url = window.URL.createObjectURL(blob);
       setDownloadLink(url);
       setUploaded(true);
-
-    } catch (err) {
-      console.error("❌ Upload failed:", err);
-      setError("Upload failed: " + (err.message || "Please try again."));
+    } catch (error) {
+      console.error("❌ Upload failed:", error);
+      setError("Upload failed: " + (error.message || "Please try again."));
     }
-
+  
     setLoading(false);
   };
+  
 
   return (
     <Box sx={{ maxWidth: 800, mx: 'auto', p: 3, borderRadius: 4 }}>
