@@ -19,7 +19,7 @@ Amplify.configure({
     S3: {
       bucket: 'pdf-upload-bucket-mypharma',
       region: 'ap-south-1',
-      defaultAccessLevel: 'public'
+      defaultAccessLevel: 'guest'
     }
   },
 
