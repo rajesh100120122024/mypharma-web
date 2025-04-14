@@ -1,17 +1,9 @@
 import React, { useState } from 'react';
 import {
-  Box,
-  Typography,
-  Button,
-  Paper,
-  CircularProgress,
-  Stack,
-  Input,
-  Alert
+  Box, Typography, Button, Paper, CircularProgress, Stack, Input, Alert
 } from '@mui/material';
 import { CloudUpload, Download } from '@mui/icons-material';
 import axios from 'axios';
-import AWS from 'aws-sdk';
 
 function PdfUploader() {
   const [file, setFile] = useState(null);
@@ -20,23 +12,20 @@ function PdfUploader() {
   const [uploaded, setUploaded] = useState(false);
   const [error, setError] = useState(null);
 
-  // Configure AWS
-  AWS.config.update({
-    region: 'ap-south-1',
-    credentials: new AWS.CognitoIdentityCredentials({
-      IdentityPoolId: 'ap-south-1:fb067313-2014-4a88-94ce-63df042d5d91' // Replace with your actual Cognito Identity Pool ID
-    })
-  });
-
-  const s3 = new AWS.S3();
-  const BUCKET_NAME = 'pdf-upload-bucket-mypharma';  // Your actual bucket name
-  const UPLOAD_PREFIX = "uploads/";  // Your folder path
-
   const handleFileChange = (event) => {
     setFile(event.target.files[0]);
     setDownloadLink(null);
     setUploaded(false);
     setError(null);
+  };
+
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]); // remove base64 prefix
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
   const pollForResult = async (executionArn, retries = 15, interval = 10000) => {
@@ -45,39 +34,14 @@ function PdfUploader() {
         const res = await axios.get("https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod", {
           params: { executionArn },
         });
-
         const base64Excel = res.data?.base64Excel;
-        if (base64Excel) {
-          return base64Excel;
-        }
+        if (base64Excel) return base64Excel;
       } catch (err) {
         console.log("⏳ Still processing or failed:", err.message);
       }
-      await new Promise((resolve) => setTimeout(resolve, interval));
+      await new Promise((res) => setTimeout(res, interval));
     }
     throw new Error("❌ Step Function timed out or failed.");
-  };
-
-  const uploadToS3 = async (file) => {
-    console.log('Uploading to S3:', file.name, 'Size:', file.size);
-    
-    const fileKey = `${UPLOAD_PREFIX}${Date.now()}-${file.name}`;
-    
-    const params = {
-      Bucket: BUCKET_NAME,
-      Key: fileKey,
-      Body: file,
-      ContentType: 'application/pdf'
-    };
-    
-    try {
-      await s3.upload(params).promise();
-      console.log('Successfully uploaded to S3');
-      return fileKey;
-    } catch (error) {
-      console.error('Error uploading to S3:', error);
-      throw error;
-    }
   };
 
   const handleUpload = async () => {
@@ -86,29 +50,19 @@ function PdfUploader() {
     setError(null);
 
     try {
-      // Upload directly to S3
-      console.log("Uploading PDF to S3");
-      const s3Key = await uploadToS3(file);
-      
-      // Call Lambda with the S3 reference
+      const base64 = await fileToBase64(file);
       const response = await axios.post(
         'https://inordedh6h.execute-api.ap-south-1.amazonaws.com/Prod/start',
-        { 
-          s3Bucket: BUCKET_NAME,
-          s3Key: s3Key
-        },
-        {
-          headers: { 'Content-Type': 'application/json' }
-        }
+        { pdf: base64 },
+        { headers: { 'Content-Type': 'application/json' } }
       );
-      
+
       const executionArn = response.data.executionArn;
       const base64Excel = await pollForResult(executionArn);
-      
-      // Process Excel response
-      const byteCharacters = atob(base64Excel);
-      const byteNumbers = Array.from(byteCharacters, (char) => char.charCodeAt(0));
-      const byteArray = new Uint8Array(byteNumbers);
+
+      const byteArray = new Uint8Array(
+        atob(base64Excel).split('').map(char => char.charCodeAt(0))
+      );
       const blob = new Blob([byteArray], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
@@ -126,7 +80,7 @@ function PdfUploader() {
 
   return (
     <Box sx={{ maxWidth: 800, mx: 'auto', p: 3, borderRadius: 4 }}>
-      <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, fontSize: '1.6rem' }}>
+      <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, fontSize: '1.4rem' }}>
         PDF Uploader
       </Typography>
 
@@ -142,7 +96,7 @@ function PdfUploader() {
         <Typography variant="subtitle1" mb={2}>
           Drag and drop a PDF file here, or click to browse
         </Typography>
-        
+
         {file && (
           <Typography variant="body2" color="text.secondary" mb={1}>
             File: {file.name} ({(file.size / (1024 * 1024)).toFixed(2)} MB)
@@ -169,14 +123,12 @@ function PdfUploader() {
             py: 1.2,
             mt: 1,
             fontWeight: 'bold',
-            '&:hover': {
-              bgcolor: '#1b5e20'
-            }
+            '&:hover': { bgcolor: '#1b5e20' }
           }}
         >
           {loading ? <CircularProgress size={22} color="inherit" /> : "UPLOAD"}
         </Button>
-        
+
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
             {error}
@@ -199,9 +151,7 @@ function PdfUploader() {
               fontSize: '1rem',
               borderColor: '#00796b',
               color: '#00796b',
-              '&:hover': {
-                bgcolor: '#e0f2f1'
-              }
+              '&:hover': { bgcolor: '#e0f2f1' }
             }}
           >
             DOWNLOAD EXCEL
