@@ -70,6 +70,9 @@ function PdfUploader() {
       console.log("🔍 Auth session:", session);
       const credentials = session.credentials;
       console.log("🔍 credentials:", credentials);
+      if (!credentials) {
+        throw new Error("❌ No AWS credentials available from Amplify Auth session.");
+      }
       const s3Client = new S3Client({
         region: "ap-south-1",
         credentials: {

@@ -7,6 +7,7 @@ Amplify.configure({
     Cognito: {
       identityPoolId: 'ap-south-1:fb067313-2014-4a88-94ce-63df042d5d91',
       region: 'ap-south-1',
+      allowGuestAccess: true
       /* allowGuestAccess: true  // optional */
     }
   },
