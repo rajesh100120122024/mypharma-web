@@ -7,7 +7,7 @@ Amplify.configure({
   Auth: {
     /* v6 requires a Cognito wrapper */
     Cognito: {
-      identityPoolId: 'ap-south-1_mEVqyjVaa',
+      identityPoolId: 'ap-south-1:9886cb04-dc64-4bf9-b99d-9c23e36ab016',
       region: 'ap-south-1',
       allowGuestAccess: true
       /* allowGuestAccess: true  // optional */
