@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import { CloudUpload, Download } from '@mui/icons-material';
 import { post, get } from 'aws-amplify/api';
+import { uploadData } from 'aws-amplify/storage';
 import '../amplify'; // Import your Amplify config
 
 function PdfUploader() {
