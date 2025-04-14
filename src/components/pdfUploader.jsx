@@ -10,7 +10,6 @@ import {
   Alert
 } from '@mui/material';
 import { CloudUpload, Download } from '@mui/icons-material';
-import { uploadData, getUrl } from 'aws-amplify/storage';
 import { post, get } from 'aws-amplify/api';
 import '../amplify'; // Import your Amplify config
 
