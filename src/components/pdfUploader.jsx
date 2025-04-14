@@ -72,6 +72,7 @@ function PdfUploader() {
         key: fileName,
         data: file,
         options: {
+          accessLevel: 'guest',
           contentType: 'application/pdf',
           // ✅ Disable checksum to avoid multipart error
           checksumAlgorithm: undefined,
