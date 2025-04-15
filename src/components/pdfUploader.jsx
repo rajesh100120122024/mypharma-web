@@ -40,9 +40,9 @@ function PdfUploader() {
           }
         });
 
-        const base64Excel = res.body?.base64Excel;
-        if (base64Excel) {
-          return base64Excel;
+        const signedUrl = res.body?.signedUrl || JSON.parse(res.body)?.signedUrl;
+        if (signedUrl) {
+          return signedUrl;
         }
       } catch (err) {
         console.log("⏳ Still processing or failed:", err.message);
