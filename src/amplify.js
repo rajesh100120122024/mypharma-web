@@ -1,24 +1,17 @@
 import { Amplify } from 'aws-amplify';
 import awsExports from './aws-exports';
 
-// Validate configuration function
-const validateConfig = (config) => {
-  const requiredKeys = [
-    'Auth.Cognito.identityPoolId', 
-    'Auth.Cognito.region', 
-    'Storage.S3.bucket', 
-    'Storage.S3.region',
-    'API.REST.pdfProcessor.endpoint',
-    'API.REST.stepFunctions.endpoint'
-  ];
-
-  requiredKeys.forEach(key => {
-    const value = key.split('.').reduce((obj, k) => obj?.[k], config);
-    if (!value) {
-      console.warn(`⚠️ Missing configuration for: ${key}`);
-    }
-  });
-};
+// Safer way to configure logging
+try {
+  // Check if Logger exists before setting log level
+  if (Amplify.Logger) {
+    Amplify.Logger.LOG_LEVEL = 'DEBUG';
+  } else {
+    console.warn('Amplify Logger not found. Logging configuration skipped.');
+  }
+} catch (error) {
+  console.error('Error configuring Amplify Logger:', error);
+}
 
 // Base Amplify Configuration
 const amplifyCfg = {
@@ -42,44 +35,21 @@ const amplifyCfg = {
     REST: {
       pdfProcessor: {
         endpoint: 'https://inordedh6h.execute-api.ap-south-1.amazonaws.com/Prod',
-        region: 'ap-south-1',
-        // Additional API configuration
-        custom: {
-          headers: {
-            'Content-Type': 'application/json',
-            // Optional: Add any additional headers
-            // 'X-Custom-Header': 'value'
-          },
-          // Optional timeout configuration
-          requestTimeout: 30000 // 30 seconds
-        }
+        region: 'ap-south-1'
       },
       stepFunctions: {
         endpoint: 'https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod',
-        region: 'ap-south-1',
-        custom: {
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          requestTimeout: 30000 // 30 seconds
-        }
+        region: 'ap-south-1'
       }
     }
   }
 };
 
-// Enable debugging mode
-Amplify.Logger.LOG_LEVEL = 'DEBUG';
-
-// Validate configuration before applying
-validateConfig(amplifyCfg);
-
-// Configure Amplify
-Amplify.configure(amplifyCfg);
-
-// Additional error handling
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('Unhandled Promise Rejection:', event.reason);
-});
+// Configure Amplify with error handling
+try {
+  Amplify.configure(amplifyCfg);
+} catch (error) {
+  console.error('Error configuring Amplify:', error);
+}
 
 export default Amplify;
