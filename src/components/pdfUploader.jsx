@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Box,
   Typography,
@@ -7,168 +7,130 @@ import {
   CircularProgress,
   Input,
   Alert
-} from '@mui/material';
-import { CloudUpload, Download } from '@mui/icons-material';
-import { post, get } from 'aws-amplify/api';
-import { uploadData } from 'aws-amplify/storage';
-import '../amplify'; // Your Amplify configuration
-
+} from "@mui/material";
+import { CloudUpload, Download } from "@mui/icons-material";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { s3, BUCKET } from "../awsConfig"; // ✅ Import your S3 client
+const START_API = "https://inordedh6h.execute-api.ap-south-1.amazonaws.com/Prod/start";
+const GET_RESULT_API = "https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod/get";
 function PdfUploader() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [downloadLink, setDownloadLink] = useState(null);
   const [uploaded, setUploaded] = useState(false);
   const [error, setError] = useState(null);
-  const [progress, setProgress] = useState(0);
 
   const handleFileChange = (event) => {
     setFile(event.target.files[0]);
     setDownloadLink(null);
     setUploaded(false);
     setError(null);
-    setProgress(0);
   };
 
-  const extractExecutionArn = async (postOptions) => {
-    const raw = await post(postOptions);
+  const uploadToS3 = async (file) => {
+    const key = `uploads/${Date.now()}-${file.name}`;
 
-    console.log("📬 Lambda raw response:", raw);
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: `public/${key}`, // 👈 match Amplify-like path
+        Body: file,
+        ContentType: "application/pdf"
+      })
+    );
 
-    let parsed;
-    try {
-      if (typeof raw === 'string') {
-        parsed = JSON.parse(raw);
-      } else if (raw?.body) {
-        parsed = typeof raw.body === 'string' ? JSON.parse(raw.body) : raw.body;
-      } else {
-        parsed = raw;
+    return key;
+  };
+
+  const triggerStepFunction = async (s3Key) => {
+    const response = await fetch(
+      START_API, // 🔁 Replace with your API
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          s3Bucket: BUCKET,
+          s3Key: `public/${s3Key}`
+        })
       }
-    } catch (e) {
-      console.error("❌ Failed to parse Lambda response:", e);
-      throw new Error("Invalid Lambda response format");
-    }
+    );
 
-    const executionArn = parsed?.executionArn;
-    console.log("🧪 Final executionArn:", executionArn);
-
-    if (!executionArn) {
-      throw new Error("❌ Step Function did not return executionArn.");
-    }
-
-    return executionArn;
+    const data = await response.json();
+    return data.executionArn;
   };
 
-  const pollForResult = async (executionArn, retries = 15, interval = 10000) => {
+  const pollForResult = async (
+    executionArn,
+    retries = 15,
+    interval = 10000
+  ) => {
     for (let i = 0; i < retries; i++) {
-      try {
-        const res = await get({
-          apiName: "stepFunctions",
-          path: "/",
-          options: {
-            queryParams: { executionArn }
-          }
-        });
+      const res = await fetch(
+        `${GET_RESULT_API}?executionArn=${encodeURIComponent(
+          executionArn
+        )}`
+      );
+      const data = await res.json();
 
-        const signedUrl = res.body?.signedUrl || JSON.parse(res.body)?.signedUrl;
-        if (signedUrl) {
-          return signedUrl;
-        }
-      } catch (err) {
-        console.log("⏳ Still processing or failed:", err.message);
-      }
+      if (data?.signedUrl) return data.signedUrl;
       await new Promise((resolve) => setTimeout(resolve, interval));
     }
-    throw new Error("❌ Step Function timed out or failed.");
+
+    throw new Error("❌ Timed out waiting for Excel result");
   };
 
   const handleUpload = async () => {
     if (!file) return;
     setLoading(true);
     setError(null);
-    setProgress(0);
 
     try {
-      const fileName = `uploads/${Date.now()}-${file.name}`;
+      const s3Key = await uploadToS3(file);
+      console.log("✅ Uploaded to S3:", s3Key);
 
-      await uploadData({
-        key: fileName,
-        data: file,
-        options: {
-          accessLevel: 'guest',
-          contentType: 'application/pdf',
-          checksumAlgorithm: undefined,
-          onProgress: (progressEvent) => {
-            const transferred = progressEvent.transferredBytes || progressEvent.loaded;
-            const total = progressEvent.totalBytes || progressEvent.total;
-
-            if (total) {
-              const percentUploaded = Math.round((transferred / total) * 100);
-              setProgress(percentUploaded);
-              console.log(`📤 Upload progress: ${percentUploaded}%`);
-            } else {
-              console.log("📤 Progress missing total size:", progressEvent);
-            }
-          }
-        }
-      });
-
-      console.log("✅ Upload complete. Starting Step Function...");
-
-      const executionArn = await extractExecutionArn({
-        apiName: "pdfProcessor",
-        path: "/start",
-        options: {
-          body: {
-            s3Bucket: 'pdf-upload-bucket-mypharma',
-            s3Key: fileName
-          }
-        }
-      });
+      const executionArn = await triggerStepFunction(s3Key);
+      console.log("🚀 Step Function started:", executionArn);
 
       const signedUrl = await pollForResult(executionArn);
-      console.log("✅ Received signed URL:", signedUrl);
+      console.log("✅ Signed URL received:", signedUrl);
 
       setDownloadLink(signedUrl);
       setUploaded(true);
-    } catch (error) {
-      console.error("❌ Upload failed:", error);
-      setError("Upload failed: " + (error.message || "Please try again."));
+    } catch (err) {
+      console.error("❌ Upload failed:", err);
+      setError("Upload failed: " + err.message);
     }
 
     setLoading(false);
   };
 
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', p: 3, borderRadius: 4 }}>
-      <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, fontSize: '1.6rem' }}>
-        PDF Uploader
+    <Box sx={{ maxWidth: 800, mx: "auto", p: 3 }}>
+      <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
+        Upload Medical PDF (No Amplify)
       </Typography>
 
-      <Paper elevation={3} sx={{
-        p: 4,
-        mb: 4,
-        textAlign: 'center',
-        border: '2px dashed #90caf9',
-        borderRadius: 3,
-        bgcolor: '#f7fbff'
-      }}>
-        <CloudUpload sx={{ fontSize: 48, color: '#2e7d32', mb: 1 }} />
+      <Paper
+        elevation={3}
+        sx={{
+          p: 4,
+          mb: 4,
+          textAlign: "center",
+          border: "2px dashed #90caf9",
+          borderRadius: 3,
+          bgcolor: "#f7fbff"
+        }}
+      >
+        <CloudUpload sx={{ fontSize: 48, color: "#2e7d32", mb: 1 }} />
         <Typography variant="subtitle1" mb={2}>
-          Drag and drop a PDF file here, or click to browse
+          Choose or drag a PDF file (up to 100MB)
         </Typography>
-
-        {file && (
-          <Typography variant="body2" color="text.secondary" mb={1}>
-            File: {file.name} ({(file.size / (1024 * 1024)).toFixed(2)} MB)
-          </Typography>
-        )}
 
         <Input
           type="file"
           accept="application/pdf"
           onChange={handleFileChange}
           sx={{ mb: 2 }}
-          inputProps={{ 'aria-label': 'Upload PDF' }}
         />
 
         <Button
@@ -176,50 +138,9 @@ function PdfUploader() {
           startIcon={<CloudUpload />}
           onClick={handleUpload}
           disabled={!file || loading}
-          sx={{
-            bgcolor: '#2e7d32',
-            borderRadius: '30px',
-            px: 4,
-            py: 1.2,
-            mt: 1,
-            fontWeight: 'bold',
-            '&:hover': {
-              bgcolor: '#1b5e20'
-            }
-          }}
         >
           {loading ? <CircularProgress size={22} color="inherit" /> : "UPLOAD"}
         </Button>
-
-        {loading && progress > 0 && (
-          <Box sx={{ width: '100%', mt: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              Upload progress: {progress}%
-            </Typography>
-            <Box
-              sx={{
-                height: 10,
-                bgcolor: '#e0e0e0',
-                borderRadius: 5,
-                mt: 1,
-                position: 'relative',
-                overflow: 'hidden'
-              }}
-            >
-              <Box
-                sx={{
-                  position: 'absolute',
-                  left: 0,
-                  top: 0,
-                  height: '100%',
-                  bgcolor: '#2e7d32',
-                  width: `${progress}%`,
-                  transition: 'width 0.3s ease'
-                }}
-              />
-            </Box>
-          </Box>
-        )}
 
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
@@ -229,26 +150,12 @@ function PdfUploader() {
       </Paper>
 
       {uploaded && (
-        <Box sx={{ textAlign: 'center' }}>
+        <Box sx={{ textAlign: "center" }}>
           <Button
             variant="outlined"
             startIcon={<Download />}
             href={downloadLink}
             download="output.xlsx"
-            target="_blank"
-            rel="noopener noreferrer"
-            sx={{
-              borderRadius: '24px',
-              fontWeight: 'bold',
-              px: 4,
-              py: 1.5,
-              fontSize: '1rem',
-              borderColor: '#00796b',
-              color: '#00796b',
-              '&:hover': {
-                bgcolor: '#e0f2f1'
-              }
-            }}
           >
             DOWNLOAD EXCEL
           </Button>
