@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import { CloudUpload, Download } from '@mui/icons-material';
 import { post, get } from 'aws-amplify/api';
-import { uploadData } from 'aws-amplify/storage';
+import { uploadData, getUrl } from 'aws-amplify/storage';
 import '../amplify'; // Your Amplify configuration
 
 function PdfUploader() {
@@ -20,52 +20,77 @@ function PdfUploader() {
   const [uploaded, setUploaded] = useState(false);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState(0);
+  const [processedFileUrl, setProcessedFileUrl] = useState(null);
   
   // Prevent multiple simultaneous uploads
   const isUploadingRef = useRef(false);
 
-  const extractExecutionArn = (response) => {
-    console.group('🔍 Execution ARN Extraction');
-    console.log('Raw Response Type:', typeof response);
-    console.log('Raw Response:', JSON.stringify(response, null, 2));
-
-    try {
-      // Multiple parsing strategies
-      let parsedResponse = response;
-
-      // If response is a string, try parsing
-      if (typeof response === 'string') {
-        try {
-          parsedResponse = JSON.parse(response);
-        } catch (parseError) {
-          console.error('Failed to parse string response:', parseError);
-        }
+  const handleFileChange = (event) => {
+    const selectedFile = event.target.files[0];
+    
+    // File type and size validation
+    if (selectedFile) {
+      if (selectedFile.type !== 'application/pdf') {
+        setError('Only PDF files are allowed');
+        return;
       }
 
-      // Extract execution ARN
-      const executionArn = 
-        parsedResponse?.executionArn || 
-        parsedResponse?.body?.executionArn || 
-        (parsedResponse?.body && 
-          (typeof parsedResponse.body === 'string' 
-            ? JSON.parse(parsedResponse.body)?.executionArn 
-            : parsedResponse.body.executionArn));
+      // Optional: File size limit (e.g., 50MB)
+      const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+      if (selectedFile.size > MAX_FILE_SIZE) {
+        setError('File is too large. Maximum size is 50MB');
+        return;
+      }
 
-      console.log('Parsed Response:', parsedResponse);
-      console.log('Extracted Execution ARN:', executionArn);
+      setFile(selectedFile);
+      setDownloadLink(null);
+      setProcessedFileUrl(null);
+      setUploaded(false);
+      setError(null);
+      setProgress(0);
+    }
+  };
+
+  // Comprehensive execution ARN extraction
+  const extractExecutionArn = (response) => {
+    console.group('🔍 Execution ARN Extraction');
+    console.log('Raw Response:', response);
+
+    try {
+      // Multiple extraction strategies
+      const extractionAttempts = [
+        // Direct property checks
+        response?.executionArn,
+        response?.body?.executionArn,
+        
+        // String parsing
+        (typeof response === 'string' 
+          ? JSON.parse(response)?.executionArn 
+          : null),
+        
+        // Nested body parsing
+        (response?.body && typeof response.body === 'string' 
+          ? JSON.parse(response.body)?.executionArn 
+          : response?.body?.executionArn)
+      ];
+
+      console.log('Extraction Attempts:', extractionAttempts);
+
+      // Find first non-null/undefined ARN
+      const executionArn = extractionAttempts.find(arn => arn);
+
+      console.log('Selected Execution ARN:', executionArn);
       console.groupEnd();
 
       return executionArn;
     } catch (error) {
-      console.error('ARN Extraction Error:', {
-        message: error.message,
-        response: JSON.stringify(response)
-      });
+      console.error('ARN Extraction Error:', error);
       console.groupEnd();
       return null;
     }
   };
 
+  // Polling for Step Function result
   const pollForResult = async (executionArn, retries = 60, interval = 30000) => {
     for (let i = 0; i < retries; i++) {
       try {
@@ -110,24 +135,53 @@ function PdfUploader() {
     throw new Error("❌ Step Function timed out after 30 minutes of waiting.");
   };
 
-  const handleFileChange = (event) => {
-    const selectedFile = event.target.files[0];
-    
-    // File type validation
-    if (selectedFile && selectedFile.type !== 'application/pdf') {
-      setError('Only PDF files are allowed');
-      return;
-    }
+  // Fetch processed file from S3
+  const fetchProcessedFile = async (key) => {
+    try {
+      const { url } = await getUrl({
+        key: key,
+        options: {
+          accessLevel: 'guest'
+        }
+      });
 
-    setFile(selectedFile);
-    setDownloadLink(null);
-    setUploaded(false);
-    setError(null);
-    setProgress(0);
+      setProcessedFileUrl(url);
+      return url;
+    } catch (error) {
+      console.error('Error fetching processed file:', error);
+      setError('Could not retrieve processed file');
+      return null;
+    }
   };
 
   const handleUpload = async () => {
+    // Prevent multiple simultaneous uploads
+    if (isUploadingRef.current || !file) return;
+    
+    isUploadingRef.current = true;
+    setLoading(true);
+    setError(null);
+    setProgress(0);
+
     try {
+      const fileName = `uploads/${Date.now()}-${file.name}`;
+
+      // S3 Upload
+      await uploadData({
+        key: fileName,
+        data: file,
+        options: {
+          accessLevel: 'guest',
+          contentType: 'application/pdf',
+          onProgress: (progress) => {
+            const percentUploaded = Math.round((progress.loaded / progress.total) * 100);
+            setProgress(percentUploaded);
+            console.log(`📤 Upload Progress: ${percentUploaded}%`);
+          }
+        }
+      });
+
+      // Start Step Function
       const lambdaResponse = await post({
         apiName: "pdfProcessor",
         path: "/start",
@@ -138,41 +192,41 @@ function PdfUploader() {
           }
         }
       });
-  
-      // Comprehensive logging
-      console.group('🔬 Lambda Response Detailed Inspection');
-      console.log('Raw Response:', lambdaResponse);
+
+      // Comprehensive logging of Lambda response
+      console.group('📡 Lambda Response Details');
       console.log('Response Type:', typeof lambdaResponse);
-      
-      // Logging all properties
-      if (lambdaResponse) {
-        console.log('Response Object Keys:', Object.keys(lambdaResponse));
-        
-        // Try to parse and log body
-        try {
-          const parsedBody = typeof lambdaResponse === 'string' 
-            ? JSON.parse(lambdaResponse) 
-            : lambdaResponse.body 
-              ? (typeof lambdaResponse.body === 'string' 
-                ? JSON.parse(lambdaResponse.body) 
-                : lambdaResponse.body)
-              : lambdaResponse;
-          
-          console.log('Parsed Body:', parsedBody);
-          console.log('Parsed Body Keys:', Object.keys(parsedBody || {}));
-        } catch (parseError) {
-          console.error('Body Parsing Error:', parseError);
-        }
-      }
+      console.log('Response Keys:', Object.keys(lambdaResponse || {}));
+      console.log('Full Response:', JSON.stringify(lambdaResponse, null, 2));
       console.groupEnd();
-  
-      // Rest of your existing extraction logic
+
+      // Extract Execution ARN
+      const executionArn = extractExecutionArn(lambdaResponse);
+
+      if (!executionArn) {
+        throw new Error("❌ Step Function did not return executionArn.");
+      }
+
+      // Update UI to show long-running process
+      setError("Processing may take up to 3 minutes. Please wait...");
+
+      // Poll for result with extended timeout
+      const signedUrl = await pollForResult(executionArn);
+
+      // Clear any previous error messages
+      setError(null);
+      setDownloadLink(signedUrl);
+      setUploaded(true);
     } catch (error) {
-      console.error('Comprehensive Upload Error:', {
+      console.error("❌ Upload Failure Details:", {
         message: error.message,
         name: error.name,
-        fullError: JSON.stringify(error, null, 2)
+        stack: error.stack
       });
+      setError(`Upload failed: ${error.message || "Please try again."}`);
+    } finally {
+      setLoading(false);
+      isUploadingRef.current = false;
     }
   };
 
@@ -267,7 +321,7 @@ function PdfUploader() {
       </Paper>
 
       {uploaded && (
-        <Box sx={{ textAlign: 'center' }}>
+        <Box sx={{ textAlign: 'center', display: 'flex', justifyContent: 'center', gap: 2 }}>
           <Button
             variant="outlined"
             startIcon={<Download />}
@@ -290,6 +344,26 @@ function PdfUploader() {
           >
             DOWNLOAD EXCEL
           </Button>
+
+          {processedFileUrl && (
+            <Button
+              variant="outlined"
+              color="secondary"
+              startIcon={<Download />}
+              href={processedFileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{
+                borderRadius: '24px',
+                fontWeight: 'bold',
+                px: 4,
+                py: 1.5,
+                fontSize: '1rem'
+              }}
+            >
+              View Processed File
+            </Button>
+          )}
         </Box>
       )}
     </Box>
