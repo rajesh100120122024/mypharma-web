@@ -10,7 +10,7 @@ import {
 } from "@mui/material";
 import { CloudUpload, Download } from "@mui/icons-material";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { s3, BUCKET } from "../awsConfig"; // ✅ Your S3 config
+import { s3, BUCKET } from "../awsConfig";
 
 const START_API = "https://inordedh6h.execute-api.ap-south-1.amazonaws.com/Prod/start";
 const GET_RESULT_API = "https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod/get";
@@ -33,13 +33,12 @@ function PdfUploader() {
 
   const uploadToS3 = async (file) => {
     const key = `uploads/${Date.now()}-${file.name}`;
-    const blob = new Blob([file], { type: "application/pdf" }); // ✅ wrapped as Blob
 
     await s3.send(
       new PutObjectCommand({
         Bucket: BUCKET,
         Key: `public/${key}`,
-        Body: blob,
+        Body: file, // ✅ pass the raw File object
         ContentType: "application/pdf"
       })
     );
@@ -61,15 +60,9 @@ function PdfUploader() {
     return data.executionArn;
   };
 
-  const pollForResult = async (
-    executionArn,
-    retries = 15,
-    interval = 10000
-  ) => {
+  const pollForResult = async (executionArn, retries = 15, interval = 10000) => {
     for (let i = 0; i < retries; i++) {
-      const res = await fetch(
-        `${GET_RESULT_API}?executionArn=${encodeURIComponent(executionArn)}`
-      );
+      const res = await fetch(`${GET_RESULT_API}?executionArn=${encodeURIComponent(executionArn)}`);
       const data = await res.json();
 
       if (data?.signedUrl) return data.signedUrl;
@@ -107,7 +100,7 @@ function PdfUploader() {
   return (
     <Box sx={{ maxWidth: 800, mx: "auto", p: 3 }}>
       <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
-        Upload Medical PDF (No Amplify)
+        Upload Medical PDF
       </Typography>
 
       <Paper
