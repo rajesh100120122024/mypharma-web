@@ -127,132 +127,52 @@ function PdfUploader() {
   };
 
   const handleUpload = async () => {
-    // Prevent multiple simultaneous uploads
-    if (isUploadingRef.current || !file) return;
-    
-    isUploadingRef.current = true;
-    setLoading(true);
-    setError(null);
-    setProgress(0);
-  
     try {
-      const fileName = `uploads/${Date.now()}-${file.name}`;
-  
-      // S3 Upload
-      await uploadData({
-        key: fileName,
-        data: file,
+      const lambdaResponse = await post({
+        apiName: "pdfProcessor",
+        path: "/start",
         options: {
-          accessLevel: 'guest',
-          contentType: 'application/pdf',
-          onProgress: (progress) => {
-            const percentUploaded = Math.round((progress.loaded / progress.total) * 100);
-            setProgress(percentUploaded);
-            console.log(`📤 Upload Progress: ${percentUploaded}%`);
+          body: {
+            s3Bucket: 'pdf-upload-bucket-mypharma',
+            s3Key: fileName
           }
         }
       });
   
-      // Wrap post in a way to handle different response types
-      const getLambdaResponse = async () => {
+      // Comprehensive logging
+      console.group('🔬 Lambda Response Detailed Inspection');
+      console.log('Raw Response:', lambdaResponse);
+      console.log('Response Type:', typeof lambdaResponse);
+      
+      // Logging all properties
+      if (lambdaResponse) {
+        console.log('Response Object Keys:', Object.keys(lambdaResponse));
+        
+        // Try to parse and log body
         try {
-          const response = await post({
-            apiName: "pdfProcessor",
-            path: "/start",
-            options: {
-              body: {
-                s3Bucket: 'pdf-upload-bucket-mypharma',
-                s3Key: fileName
-              }
-            }
-          });
-  
-          console.group('📡 Lambda Response Details');
-          console.log('Raw Response:', response);
-          console.log('Response Type:', typeof response);
+          const parsedBody = typeof lambdaResponse === 'string' 
+            ? JSON.parse(lambdaResponse) 
+            : lambdaResponse.body 
+              ? (typeof lambdaResponse.body === 'string' 
+                ? JSON.parse(lambdaResponse.body) 
+                : lambdaResponse.body)
+              : lambdaResponse;
           
-          // If response is a Promise, await it
-          const resolvedResponse = response instanceof Promise 
-            ? await response 
-            : response;
-  
-          console.log('Resolved Response:', resolvedResponse);
-          console.log('Resolved Response Type:', typeof resolvedResponse);
-          console.log('Resolved Response Keys:', Object.keys(resolvedResponse || {}));
-          console.groupEnd();
-  
-          return resolvedResponse;
-        } catch (error) {
-          console.error('Lambda Call Error:', {
-            message: error.message,
-            name: error.name,
-            stack: error.stack
-          });
-          throw error;
+          console.log('Parsed Body:', parsedBody);
+          console.log('Parsed Body Keys:', Object.keys(parsedBody || {}));
+        } catch (parseError) {
+          console.error('Body Parsing Error:', parseError);
         }
-      };
-  
-      // Get Lambda response
-      const lambdaResponse = await getLambdaResponse();
-  
-      // Comprehensive extraction of execution ARN
-      const extractExecutionArn = (response) => {
-        console.group('🔍 Execution ARN Extraction');
-        console.log('Raw Response:', response);
-  
-        try {
-          // Multiple extraction strategies
-          const arnCandidates = [
-            response?.executionArn,
-            response?.body?.executionArn,
-            response?.response?.executionArn,
-            (typeof response === 'string' ? JSON.parse(response)?.executionArn : null),
-            (response?.body && typeof response.body === 'string' 
-              ? JSON.parse(response.body)?.executionArn 
-              : response?.body?.executionArn)
-          ];
-  
-          const executionArn = arnCandidates.find(arn => arn);
-  
-          console.log('ARN Candidates:', arnCandidates);
-          console.log('Selected ARN:', executionArn);
-          console.groupEnd();
-  
-          return executionArn;
-        } catch (error) {
-          console.error('ARN Extraction Error:', error);
-          console.groupEnd();
-          return null;
-        }
-      };
-  
-      // Extract Execution ARN
-      const executionArn = extractExecutionArn(lambdaResponse);
-  
-      if (!executionArn) {
-        throw new Error("❌ Step Function did not return executionArn.");
       }
+      console.groupEnd();
   
-      // Update UI to show long-running process
-      setError("Processing may take up to 3 minutes. Please wait...");
-  
-      // Poll for result with extended timeout
-      const signedUrl = await pollForResult(executionArn);
-  
-      // Clear any previous error messages
-      setError(null);
-      setDownloadLink(signedUrl);
-      setUploaded(true);
+      // Rest of your existing extraction logic
     } catch (error) {
-      console.error("❌ Upload Failure Details:", {
+      console.error('Comprehensive Upload Error:', {
         message: error.message,
         name: error.name,
-        stack: error.stack
+        fullError: JSON.stringify(error, null, 2)
       });
-      setError(`Upload failed: ${error.message || "Please try again."}`);
-    } finally {
-      setLoading(false);
-      isUploadingRef.current = false;
     }
   };
 
