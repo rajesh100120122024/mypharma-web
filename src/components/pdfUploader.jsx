@@ -24,23 +24,45 @@ function PdfUploader() {
   // Prevent multiple simultaneous uploads
   const isUploadingRef = useRef(false);
 
-  const handleFileChange = (event) => {
-    const selectedFile = event.target.files[0];
-    
-    // File type validation
-    if (selectedFile && selectedFile.type !== 'application/pdf') {
-      setError('Only PDF files are allowed');
-      return;
-    }
+  const extractExecutionArn = (response) => {
+    console.group('🔍 Execution ARN Extraction');
+    console.log('Raw Response:', JSON.stringify(response, null, 2));
 
-    setFile(selectedFile);
-    setDownloadLink(null);
-    setUploaded(false);
-    setError(null);
-    setProgress(0);
+    try {
+      // Multiple extraction strategies
+      const arnCandidates = [
+        // Direct property
+        response?.executionArn,
+        // Nested in body
+        response?.body?.executionArn,
+        // Parsed from string body
+        response?.body && typeof response.body === 'string' 
+          ? JSON.parse(response.body)?.executionArn 
+          : null,
+        // Parsing string response
+        typeof response === 'string' 
+          ? JSON.parse(response)?.executionArn 
+          : null
+      ];
+
+      // Find first non-null ARN
+      const executionArn = arnCandidates.find(arn => arn);
+
+      console.log('Extracted ARN Candidates:', arnCandidates);
+      console.log('Selected Execution ARN:', executionArn);
+      console.groupEnd();
+
+      return executionArn;
+    } catch (error) {
+      console.error('ARN Extraction Error:', {
+        message: error.message,
+        response: JSON.stringify(response)
+      });
+      console.groupEnd();
+      return null;
+    }
   };
 
-  // Polling function with extended timeout
   const pollForResult = async (executionArn, retries = 60, interval = 30000) => {
     for (let i = 0; i < retries; i++) {
       try {
@@ -85,6 +107,22 @@ function PdfUploader() {
     throw new Error("❌ Step Function timed out after 30 minutes of waiting.");
   };
 
+  const handleFileChange = (event) => {
+    const selectedFile = event.target.files[0];
+    
+    // File type validation
+    if (selectedFile && selectedFile.type !== 'application/pdf') {
+      setError('Only PDF files are allowed');
+      return;
+    }
+
+    setFile(selectedFile);
+    setDownloadLink(null);
+    setUploaded(false);
+    setError(null);
+    setProgress(0);
+  };
+
   const handleUpload = async () => {
     // Prevent multiple simultaneous uploads
     if (isUploadingRef.current || !file) return;
@@ -97,7 +135,7 @@ function PdfUploader() {
     try {
       const fileName = `uploads/${Date.now()}-${file.name}`;
 
-      // Extended timeout for S3 upload
+      // S3 Upload
       await uploadData({
         key: fileName,
         data: file,
@@ -124,21 +162,14 @@ function PdfUploader() {
         }
       });
 
-      // Comprehensive execution ARN extraction
-      const extractExecutionArn = (response) => {
-        if (typeof response === 'string') {
-          try {
-            const parsed = JSON.parse(response);
-            return parsed?.executionArn || parsed?.body?.executionArn;
-          } catch {
-            return null;
-          }
-        }
-        return response?.executionArn || 
-               response?.body?.executionArn || 
-               (response?.body && JSON.parse(response.body)?.executionArn);
-      };
+      // Comprehensive logging
+      console.group('📡 Lambda Response Details');
+      console.log('Response Type:', typeof lambdaResponse);
+      console.log('Response Keys:', Object.keys(lambdaResponse || {}));
+      console.log('Full Response:', JSON.stringify(lambdaResponse, null, 2));
+      console.groupEnd();
 
+      // Extract Execution ARN
       const executionArn = extractExecutionArn(lambdaResponse);
 
       if (!executionArn) {
@@ -156,7 +187,11 @@ function PdfUploader() {
       setDownloadLink(signedUrl);
       setUploaded(true);
     } catch (error) {
-      console.error("❌ Upload failed:", error);
+      console.error("❌ Upload Failure Details:", {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
       setError(`Upload failed: ${error.message || "Please try again."}`);
     } finally {
       setLoading(false);
