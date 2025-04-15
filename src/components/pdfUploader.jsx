@@ -40,9 +40,14 @@ function PdfUploader() {
     setProgress(0);
   };
 
-  const pollForResult = async (executionArn, retries = 15, interval = 10000) => {
+  // Polling function with extended timeout
+  const pollForResult = async (executionArn, retries = 60, interval = 30000) => {
     for (let i = 0; i < retries; i++) {
       try {
+        console.group(`🕰️ Result Polling - Attempt ${i + 1}`);
+        console.log(`Execution ARN: ${executionArn}`);
+        console.log(`Total Wait Time: ${(i * interval / 1000 / 60).toFixed(2)} minutes`);
+
         const res = await get({
           apiName: "stepFunctions",
           path: "/",
@@ -51,16 +56,33 @@ function PdfUploader() {
           }
         });
 
-        const signedUrl = res.body?.signedUrl || JSON.parse(res.body)?.signedUrl;
+        console.log("Step Functions Response:", JSON.stringify(res, null, 2));
+
+        const signedUrl = 
+          res.body?.signedUrl || 
+          (typeof res.body === 'string' ? JSON.parse(res.body)?.signedUrl : null);
+
         if (signedUrl) {
+          console.log('✅ Signed URL found after ' + 
+            `${(i * interval / 1000 / 60).toFixed(2)} minutes`);
+          console.groupEnd();
           return signedUrl;
         }
+
+        console.log(`⏳ Result not ready. Waiting ${interval/1000} seconds...`);
+        console.groupEnd();
       } catch (err) {
-        console.log("⏳ Still processing or failed:", err.message);
+        console.error(`🔄 Polling Error (Attempt ${i + 1}):`, {
+          message: err.message,
+          name: err.name
+        });
       }
+
+      // Wait before next attempt
       await new Promise((resolve) => setTimeout(resolve, interval));
     }
-    throw new Error("❌ Step Function timed out or failed.");
+
+    throw new Error("❌ Step Function timed out after 30 minutes of waiting.");
   };
 
   const handleUpload = async () => {
@@ -75,25 +97,22 @@ function PdfUploader() {
     try {
       const fileName = `uploads/${Date.now()}-${file.name}`;
 
-      // Upload to S3 via Amplify Storage
+      // Extended timeout for S3 upload
       await uploadData({
         key: fileName,
         data: file,
         options: {
           accessLevel: 'guest',
           contentType: 'application/pdf',
-          checksumAlgorithm: undefined,
           onProgress: (progress) => {
             const percentUploaded = Math.round((progress.loaded / progress.total) * 100);
             setProgress(percentUploaded);
-            console.log(`📤 Upload progress: ${percentUploaded}%`);
+            console.log(`📤 Upload Progress: ${percentUploaded}%`);
           }
         }
       });
 
-      console.log("✅ Upload complete. Starting Step Function...");
-
-      // Call Lambda to start Step Function
+      // Start Step Function
       const lambdaResponse = await post({
         apiName: "pdfProcessor",
         path: "/start",
@@ -105,27 +124,40 @@ function PdfUploader() {
         }
       });
 
-      console.log("📬 Lambda raw response:", lambdaResponse);
+      // Comprehensive execution ARN extraction
+      const extractExecutionArn = (response) => {
+        if (typeof response === 'string') {
+          try {
+            const parsed = JSON.parse(response);
+            return parsed?.executionArn || parsed?.body?.executionArn;
+          } catch {
+            return null;
+          }
+        }
+        return response?.executionArn || 
+               response?.body?.executionArn || 
+               (response?.body && JSON.parse(response.body)?.executionArn);
+      };
 
-      const parsed = typeof lambdaResponse === 'string'
-        ? JSON.parse(lambdaResponse)
-        : lambdaResponse;
-
-      const executionArn = parsed?.executionArn;
-      console.log("🧪 executionArn:", executionArn);
+      const executionArn = extractExecutionArn(lambdaResponse);
 
       if (!executionArn) {
         throw new Error("❌ Step Function did not return executionArn.");
       }
 
-      const signedUrl = await pollForResult(executionArn);
-      console.log("✅ Received signed URL:", signedUrl);
+      // Update UI to show long-running process
+      setError("Processing may take up to 3 minutes. Please wait...");
 
+      // Poll for result with extended timeout
+      const signedUrl = await pollForResult(executionArn);
+
+      // Clear any previous error messages
+      setError(null);
       setDownloadLink(signedUrl);
       setUploaded(true);
     } catch (error) {
       console.error("❌ Upload failed:", error);
-      setError("Upload failed: " + (error.message || "Please try again."));
+      setError(`Upload failed: ${error.message || "Please try again."}`);
     } finally {
       setLoading(false);
       isUploadingRef.current = false;
