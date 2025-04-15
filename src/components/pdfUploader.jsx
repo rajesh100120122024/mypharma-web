@@ -31,18 +31,20 @@ function PdfUploader() {
 
   const extractExecutionArn = async (postOptions) => {
     const raw = await post(postOptions);
-    const response = await raw.response;
 
-    console.log("📬 Lambda resolved response:", response);
-
-    let bodyText = await response.text(); // ✅ handle ReadableStream
-    console.log("🧾 Lambda response text:", bodyText);
+    console.log("📬 Lambda raw response:", raw);
 
     let parsed;
     try {
-      parsed = JSON.parse(bodyText);
+      if (typeof raw === 'string') {
+        parsed = JSON.parse(raw);
+      } else if (raw?.body) {
+        parsed = typeof raw.body === 'string' ? JSON.parse(raw.body) : raw.body;
+      } else {
+        parsed = raw;
+      }
     } catch (e) {
-      console.error("❌ Failed to parse Lambda body:", e);
+      console.error("❌ Failed to parse Lambda response:", e);
       throw new Error("Invalid Lambda response format");
     }
 
@@ -95,13 +97,16 @@ function PdfUploader() {
           accessLevel: 'guest',
           contentType: 'application/pdf',
           checksumAlgorithm: undefined,
-          onProgress: (progress) => {
-            if (progress.total) {
-              const percentUploaded = Math.round((progress.loaded / progress.total) * 100);
+          onProgress: (progressEvent) => {
+            const transferred = progressEvent.transferredBytes || progressEvent.loaded;
+            const total = progressEvent.totalBytes || progressEvent.total;
+
+            if (total) {
+              const percentUploaded = Math.round((transferred / total) * 100);
               setProgress(percentUploaded);
               console.log(`📤 Upload progress: ${percentUploaded}%`);
             } else {
-              console.log("📤 Progress missing total size:", progress);
+              console.log("📤 Progress missing total size:", progressEvent);
             }
           }
         }
@@ -119,8 +124,6 @@ function PdfUploader() {
           }
         }
       });
-
-      console.log("🚀 Step Function executionArn received:", executionArn);
 
       const signedUrl = await pollForResult(executionArn);
       console.log("✅ Received signed URL:", signedUrl);
