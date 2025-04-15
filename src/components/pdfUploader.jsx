@@ -26,26 +26,35 @@ function PdfUploader() {
 
   const extractExecutionArn = (response) => {
     console.group('🔍 Execution ARN Extraction');
+    console.log('Raw Response Type:', typeof response);
     console.log('Raw Response:', JSON.stringify(response, null, 2));
-  
+
     try {
-      // Direct extraction of execution ARN
-      let executionArn;
-  
-      // If response is a string, parse it
+      // Multiple parsing strategies
+      let parsedResponse = response;
+
+      // If response is a string, try parsing
       if (typeof response === 'string') {
-        const parsed = JSON.parse(response);
-        executionArn = parsed.executionArn;
-      } 
-      // If response is an object
-      else if (typeof response === 'object' && response !== null) {
-        executionArn = response.executionArn || 
-                       (response.body && JSON.parse(response.body).executionArn);
+        try {
+          parsedResponse = JSON.parse(response);
+        } catch (parseError) {
+          console.error('Failed to parse string response:', parseError);
+        }
       }
-  
+
+      // Extract execution ARN
+      const executionArn = 
+        parsedResponse?.executionArn || 
+        parsedResponse?.body?.executionArn || 
+        (parsedResponse?.body && 
+          (typeof parsedResponse.body === 'string' 
+            ? JSON.parse(parsedResponse.body)?.executionArn 
+            : parsedResponse.body.executionArn));
+
+      console.log('Parsed Response:', parsedResponse);
       console.log('Extracted Execution ARN:', executionArn);
       console.groupEnd();
-  
+
       return executionArn;
     } catch (error) {
       console.error('ARN Extraction Error:', {
@@ -156,7 +165,7 @@ function PdfUploader() {
         }
       });
 
-      // Comprehensive logging
+      // Comprehensive logging of Lambda response
       console.group('📡 Lambda Response Details');
       console.log('Response Type:', typeof lambdaResponse);
       console.log('Response Keys:', Object.keys(lambdaResponse || {}));
