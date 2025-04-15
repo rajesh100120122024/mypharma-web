@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -6,13 +6,12 @@ import {
   Paper,
   CircularProgress,
   Input,
-  Alert,
-  Snackbar
+  Alert
 } from '@mui/material';
-import { CloudUpload, Download, ErrorOutline } from '@mui/icons-material';
+import { CloudUpload, Download } from '@mui/icons-material';
 import { post, get } from 'aws-amplify/api';
 import { uploadData } from 'aws-amplify/storage';
-import '../amplify';
+import '../amplify'; // Your Amplify configuration
 
 function PdfUploader() {
   const [file, setFile] = useState(null);
@@ -21,147 +20,81 @@ function PdfUploader() {
   const [uploaded, setUploaded] = useState(false);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState(0);
-  const [openSnackbar, setOpenSnackbar] = useState(false);
   
   // Prevent multiple simultaneous uploads
   const isUploadingRef = useRef(false);
 
-  const handleFileChange = useCallback((event) => {
+  const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
     
-    if (selectedFile) {
-      if (selectedFile.type !== 'application/pdf') {
-        setError('Only PDF files are allowed');
-        setOpenSnackbar(true);
-        return;
-      }
-
-      const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-      if (selectedFile.size > MAX_FILE_SIZE) {
-        setError('File is too large. Maximum size is 50MB');
-        setOpenSnackbar(true);
-        return;
-      }
-
-      setFile(selectedFile);
-      setDownloadLink(null);
-      setUploaded(false);
-      setError(null);
-      setProgress(0);
+    // File type validation
+    if (selectedFile && selectedFile.type !== 'application/pdf') {
+      setError('Only PDF files are allowed');
+      return;
     }
-  }, []);
 
-  // Enhanced logging and error handling
-  const logAndHandleError = (message, errorDetails = {}) => {
-    console.error('Upload Error:', {
-      message,
-      ...errorDetails
-    });
-    setError(message);
-    setOpenSnackbar(true);
-    isUploadingRef.current = false;
+    setFile(selectedFile);
+    setDownloadLink(null);
+    setUploaded(false);
+    setError(null);
+    setProgress(0);
   };
 
-  const waitForExecutionArn = async (postOptions) => {
-    try {
-      console.group('🚀 Step Function Execution ARN Retrieval');
-      console.log('API Call Options:', JSON.stringify(postOptions, null, 2));
-
-      // Perform API call with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-      const lambdaResponse = await post({
-        ...postOptions,
-        options: {
-          ...postOptions.options,
-          signal: controller.signal
-        }
-      });
-
-      clearTimeout(timeoutId);
-
-      console.log('Raw Lambda Response:', JSON.stringify(lambdaResponse, null, 2));
-
-      // Comprehensive ARN extraction
-      const extractExecutionArn = (response) => {
-        // Multiple extraction strategies
-        if (typeof response === 'string') {
-          try {
-            const parsed = JSON.parse(response);
-            return parsed?.executionArn || parsed?.body?.executionArn;
-          } catch {
-            return null;
+  const pollForResult = async (executionArn, retries = 15, interval = 10000) => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const res = await get({
+          apiName: "stepFunctions",
+          path: "/",
+          options: {
+            queryParams: { executionArn }
           }
+        });
+
+        const signedUrl = res.body?.signedUrl || JSON.parse(res.body)?.signedUrl;
+        if (signedUrl) {
+          return signedUrl;
         }
-        
-        return response?.executionArn || 
-               response?.body?.executionArn || 
-               (response?.body && JSON.parse(response.body)?.executionArn);
-      };
-
-      const executionArn = extractExecutionArn(lambdaResponse);
-      
-      console.log('Extracted Execution ARN:', executionArn);
-      console.groupEnd();
-
-      if (!executionArn) {
-        throw new Error('No execution ARN found in response');
+      } catch (err) {
+        console.log("⏳ Still processing or failed:", err.message);
       }
-
-      return executionArn;
-    } catch (error) {
-      console.error('Execution ARN Retrieval Error:', {
-        message: error.message,
-        name: error.name,
-        stack: error.stack
-      });
-      throw error;
+      await new Promise((resolve) => setTimeout(resolve, interval));
     }
+    throw new Error("❌ Step Function timed out or failed.");
   };
 
   const handleUpload = async () => {
     // Prevent multiple simultaneous uploads
-    if (isUploadingRef.current || !file) {
-      return;
-    }
-
+    if (isUploadingRef.current || !file) return;
+    
     isUploadingRef.current = true;
     setLoading(true);
     setError(null);
     setProgress(0);
 
     try {
-      // Generate unique filename
       const fileName = `uploads/${Date.now()}-${file.name}`;
 
-      console.group('📤 PDF Upload Process');
-      console.log('File Details:', {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        uploadPath: fileName
-      });
-
-      // S3 Upload
+      // Upload to S3 via Amplify Storage
       await uploadData({
         key: fileName,
         data: file,
         options: {
           accessLevel: 'guest',
           contentType: 'application/pdf',
+          checksumAlgorithm: undefined,
           onProgress: (progress) => {
             const percentUploaded = Math.round((progress.loaded / progress.total) * 100);
-            console.log(`Upload Progress: ${percentUploaded}%`);
             setProgress(percentUploaded);
+            console.log(`📤 Upload progress: ${percentUploaded}%`);
           }
         }
       });
 
-      console.log('✅ S3 Upload Complete');
+      console.log("✅ Upload complete. Starting Step Function...");
 
-      // Start Step Function
-      const executionArn = await waitForExecutionArn({
+      // Call Lambda to start Step Function
+      const lambdaResponse = await post({
         apiName: "pdfProcessor",
         path: "/start",
         options: {
@@ -172,75 +105,149 @@ function PdfUploader() {
         }
       });
 
-      console.log('🚀 Step Function Execution ARN:', executionArn);
+      console.log("📬 Lambda raw response:", lambdaResponse);
 
-      // Poll for result with improved error handling
-      const signedUrl = await new Promise((resolve, reject) => {
-        let attempts = 0;
-        const maxAttempts = 15;
+      const parsed = typeof lambdaResponse === 'string'
+        ? JSON.parse(lambdaResponse)
+        : lambdaResponse;
 
-        const checkExecution = async () => {
-          try {
-            const res = await get({
-              apiName: "stepFunctions",
-              path: "/",
-              options: {
-                queryParams: { executionArn }
-              }
-            });
+      const executionArn = parsed?.executionArn;
+      console.log("🧪 executionArn:", executionArn);
 
-            console.log('Step Functions Response:', JSON.stringify(res, null, 2));
+      if (!executionArn) {
+        throw new Error("❌ Step Function did not return executionArn.");
+      }
 
-            const signedUrl = 
-              res.body?.signedUrl || 
-              (typeof res.body === 'string' ? JSON.parse(res.body)?.signedUrl : null);
-
-            if (signedUrl) {
-              resolve(signedUrl);
-            } else {
-              attempts++;
-              if (attempts < maxAttempts) {
-                setTimeout(checkExecution, 10000); // 10 seconds between attempts
-              } else {
-                reject(new Error('Step Function timed out'));
-              }
-            }
-          } catch (err) {
-            attempts++;
-            if (attempts < maxAttempts) {
-              setTimeout(checkExecution, 10000);
-            } else {
-              reject(err);
-            }
-          }
-        };
-
-        checkExecution();
-      });
-
-      console.log('✅ Signed URL Received:', signedUrl);
-      console.groupEnd();
+      const signedUrl = await pollForResult(executionArn);
+      console.log("✅ Received signed URL:", signedUrl);
 
       setDownloadLink(signedUrl);
       setUploaded(true);
-      isUploadingRef.current = false;
     } catch (error) {
-      logAndHandleError(`Upload failed: ${error.message || 'Unknown error'}`, {
-        name: error.name,
-        stack: error.stack
-      });
+      console.error("❌ Upload failed:", error);
+      setError("Upload failed: " + (error.message || "Please try again."));
     } finally {
       setLoading(false);
       isUploadingRef.current = false;
     }
   };
 
-  // Rest of the component remains the same as in previous version
-  // ... (render method, etc.)
-
   return (
     <Box sx={{ maxWidth: 800, mx: 'auto', p: 3, borderRadius: 4 }}>
-      {/* ... existing UI code ... */}
+      <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, fontSize: '1.6rem' }}>
+        PDF Uploader
+      </Typography>
+
+      <Paper elevation={3} sx={{
+        p: 4,
+        mb: 4,
+        textAlign: 'center',
+        border: '2px dashed #90caf9',
+        borderRadius: 3,
+        bgcolor: '#f7fbff'
+      }}>
+        <CloudUpload sx={{ fontSize: 48, color: '#2e7d32', mb: 1 }} />
+        <Typography variant="subtitle1" mb={2}>
+          Drag and drop a PDF file here, or click to browse
+        </Typography>
+
+        {file && (
+          <Typography variant="body2" color="text.secondary" mb={1}>
+            File: {file.name} ({(file.size / (1024 * 1024)).toFixed(2)} MB)
+          </Typography>
+        )}
+
+        <Input
+          type="file"
+          accept="application/pdf"
+          onChange={handleFileChange}
+          sx={{ mb: 2 }}
+          inputProps={{ 'aria-label': 'Upload PDF' }}
+        />
+
+        <Button
+          variant="contained"
+          startIcon={<CloudUpload />}
+          onClick={handleUpload}
+          disabled={!file || loading}
+          sx={{
+            bgcolor: '#2e7d32',
+            borderRadius: '30px',
+            px: 4,
+            py: 1.2,
+            mt: 1,
+            fontWeight: 'bold',
+            '&:hover': {
+              bgcolor: '#1b5e20'
+            }
+          }}
+        >
+          {loading ? <CircularProgress size={22} color="inherit" /> : "UPLOAD"}
+        </Button>
+
+        {loading && progress > 0 && (
+          <Box sx={{ width: '100%', mt: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              Upload progress: {progress}%
+            </Typography>
+            <Box
+              sx={{
+                height: 10,
+                bgcolor: '#e0e0e0',
+                borderRadius: 5,
+                mt: 1,
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+            >
+              <Box
+                sx={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  height: '100%',
+                  bgcolor: '#2e7d32',
+                  width: `${progress}%`,
+                  transition: 'width 0.3s ease'
+                }}
+              />
+            </Box>
+          </Box>
+        )}
+
+        {error && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
+        )}
+      </Paper>
+
+      {uploaded && (
+        <Box sx={{ textAlign: 'center' }}>
+          <Button
+            variant="outlined"
+            startIcon={<Download />}
+            href={downloadLink}
+            download="output.xlsx"
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{
+              borderRadius: '24px',
+              fontWeight: 'bold',
+              px: 4,
+              py: 1.5,
+              fontSize: '1rem',
+              borderColor: '#00796b',
+              color: '#00796b',
+              '&:hover': {
+                bgcolor: '#e0f2f1'
+              }
+            }}
+          >
+            DOWNLOAD EXCEL
+          </Button>
+        </Box>
+      )}
     </Box>
   );
 }
