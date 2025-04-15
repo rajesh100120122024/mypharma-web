@@ -96,11 +96,12 @@ function PdfUploader() {
 
       let parsed;
       try {
-        const rawBody = response.response?.body || response.body;
+        const lambdaResponse = await response.response; // 🛠️ Await the response Promise
+        const rawBody = lambdaResponse.body;
+
         parsed = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;
-        //parsed = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
         console.log("✅ Parsed Lambda response:", parsed);
-        console.log("🧪 Full response from Lambda:", response);
+        console.log("🧪 Full response from Lambda:", lambdaResponse);
       } catch (e) {
         throw new Error("❌ Failed to parse Lambda response: " + e.message);
       }
