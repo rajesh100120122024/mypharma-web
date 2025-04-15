@@ -27,31 +27,25 @@ function PdfUploader() {
   const extractExecutionArn = (response) => {
     console.group('🔍 Execution ARN Extraction');
     console.log('Raw Response:', JSON.stringify(response, null, 2));
-
+  
     try {
-      // Multiple extraction strategies
-      const arnCandidates = [
-        // Direct property
-        response?.executionArn,
-        // Nested in body
-        response?.body?.executionArn,
-        // Parsed from string body
-        response?.body && typeof response.body === 'string' 
-          ? JSON.parse(response.body)?.executionArn 
-          : null,
-        // Parsing string response
-        typeof response === 'string' 
-          ? JSON.parse(response)?.executionArn 
-          : null
-      ];
-
-      // Find first non-null ARN
-      const executionArn = arnCandidates.find(arn => arn);
-
-      console.log('Extracted ARN Candidates:', arnCandidates);
-      console.log('Selected Execution ARN:', executionArn);
+      // Direct extraction of execution ARN
+      let executionArn;
+  
+      // If response is a string, parse it
+      if (typeof response === 'string') {
+        const parsed = JSON.parse(response);
+        executionArn = parsed.executionArn;
+      } 
+      // If response is an object
+      else if (typeof response === 'object' && response !== null) {
+        executionArn = response.executionArn || 
+                       (response.body && JSON.parse(response.body).executionArn);
+      }
+  
+      console.log('Extracted Execution ARN:', executionArn);
       console.groupEnd();
-
+  
       return executionArn;
     } catch (error) {
       console.error('ARN Extraction Error:', {
