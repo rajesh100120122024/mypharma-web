@@ -10,9 +10,11 @@ import {
 } from "@mui/material";
 import { CloudUpload, Download } from "@mui/icons-material";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { s3, BUCKET } from "../awsConfig"; // ✅ Import your S3 client
+import { s3, BUCKET } from "../awsConfig"; // ✅ Your S3 config
+
 const START_API = "https://inordedh6h.execute-api.ap-south-1.amazonaws.com/Prod/start";
 const GET_RESULT_API = "https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod/get";
+
 function PdfUploader() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -21,7 +23,9 @@ function PdfUploader() {
   const [error, setError] = useState(null);
 
   const handleFileChange = (event) => {
-    setFile(event.target.files[0]);
+    const selected = event.target.files[0];
+    console.log("📂 Selected file:", selected);
+    setFile(selected);
     setDownloadLink(null);
     setUploaded(false);
     setError(null);
@@ -29,12 +33,13 @@ function PdfUploader() {
 
   const uploadToS3 = async (file) => {
     const key = `uploads/${Date.now()}-${file.name}`;
+    const blob = new Blob([file], { type: "application/pdf" }); // ✅ wrapped as Blob
 
     await s3.send(
       new PutObjectCommand({
         Bucket: BUCKET,
-        Key: `public/${key}`, // 👈 match Amplify-like path
-        Body: file,
+        Key: `public/${key}`,
+        Body: blob,
         ContentType: "application/pdf"
       })
     );
@@ -43,17 +48,14 @@ function PdfUploader() {
   };
 
   const triggerStepFunction = async (s3Key) => {
-    const response = await fetch(
-      START_API, // 🔁 Replace with your API
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          s3Bucket: BUCKET,
-          s3Key: `public/${s3Key}`
-        })
-      }
-    );
+    const response = await fetch(START_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        s3Bucket: BUCKET,
+        s3Key: `public/${s3Key}`
+      })
+    });
 
     const data = await response.json();
     return data.executionArn;
@@ -66,9 +68,7 @@ function PdfUploader() {
   ) => {
     for (let i = 0; i < retries; i++) {
       const res = await fetch(
-        `${GET_RESULT_API}?executionArn=${encodeURIComponent(
-          executionArn
-        )}`
+        `${GET_RESULT_API}?executionArn=${encodeURIComponent(executionArn)}`
       );
       const data = await res.json();
 
