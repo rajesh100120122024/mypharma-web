@@ -29,6 +29,40 @@ function PdfUploader() {
     setProgress(0);
   };
 
+  const waitForExecutionArn = async (postOptions, maxRetries = 5, delay = 2000) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      console.log(`🌀 Attempt ${attempt} to fetch executionArn...`);
+
+      try {
+        const lambdaResponse = await post(postOptions);
+
+        let parsed;
+        if (typeof lambdaResponse === 'string') {
+          parsed = JSON.parse(lambdaResponse);
+        } else if (lambdaResponse?.body) {
+          parsed = typeof lambdaResponse.body === 'string'
+            ? JSON.parse(lambdaResponse.body)
+            : lambdaResponse.body;
+        } else {
+          parsed = lambdaResponse;
+        }
+
+        const executionArn = parsed?.executionArn;
+        console.log("🧪 executionArn:", executionArn);
+
+        if (executionArn) {
+          return executionArn;
+        }
+      } catch (error) {
+        console.warn(`⚠️ Error in attempt ${attempt}:`, error.message);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+
+    throw new Error("❌ executionArn not received after retries.");
+  };
+
   const pollForResult = async (executionArn, retries = 15, interval = 10000) => {
     for (let i = 0; i < retries; i++) {
       try {
@@ -61,7 +95,6 @@ function PdfUploader() {
     try {
       const fileName = `uploads/${Date.now()}-${file.name}`;
 
-      // Upload to S3 via Amplify Storage
       await uploadData({
         key: fileName,
         data: file,
@@ -79,8 +112,7 @@ function PdfUploader() {
 
       console.log("✅ Upload complete. Starting Step Function...");
 
-      // Call Lambda to start Step Function
-      const lambdaResponse = await post({
+      const executionArn = await waitForExecutionArn({
         apiName: "pdfProcessor",
         path: "/start",
         options: {
@@ -91,18 +123,7 @@ function PdfUploader() {
         }
       });
 
-      console.log("📬 Lambda raw response:", lambdaResponse);
-
-      const parsed = typeof lambdaResponse === 'string'
-        ? JSON.parse(lambdaResponse)
-        : lambdaResponse;
-
-      const executionArn = parsed?.executionArn;
-      console.log("🧪 executionArn:", executionArn);
-
-      if (!executionArn) {
-        throw new Error("❌ Step Function did not return executionArn.");
-      }
+      console.log("🚀 Step Function executionArn received:", executionArn);
 
       const signedUrl = await pollForResult(executionArn);
       console.log("✅ Received signed URL:", signedUrl);
