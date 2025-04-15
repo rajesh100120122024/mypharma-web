@@ -5,15 +5,11 @@ import {
   Button,
   Paper,
   CircularProgress,
-  Stack,
   Input,
   Alert
 } from '@mui/material';
 import { CloudUpload, Download } from '@mui/icons-material';
 import { post, get } from 'aws-amplify/api';
-import { fetchAuthSession } from 'aws-amplify/auth';
-import { S3Client } from '@aws-sdk/client-s3';
-import { Upload } from '@aws-sdk/lib-storage';
 import { uploadData } from 'aws-amplify/storage';
 import '../amplify'; // Your Amplify configuration
 
@@ -61,12 +57,12 @@ function PdfUploader() {
     setLoading(true);
     setError(null);
     setProgress(0);
-  
+
     try {
       // Upload to S3 using Amplify Storage
       console.log("📤 Uploading PDF to S3...");
       const fileName = `uploads/${Date.now()}-${file.name}`;
-  
+
       // Upload with progress tracking and checksum disabled
       await uploadData({
         key: fileName,
@@ -83,9 +79,9 @@ function PdfUploader() {
           }
         }
       });
-  
+
       console.log("✅ Upload complete, calling Lambda...");
-  
+
       // Call Lambda to start Step Function
       const response = await post({
         apiName: "pdfProcessor",
@@ -97,13 +93,29 @@ function PdfUploader() {
           }
         }
       });
-  
-      const executionArn = response.body.executionArn;
+
+      let parsed;
+      try {
+        const rawBody = response.response?.body || response.body;
+        parsed = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;
+        //parsed = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
+        console.log("✅ Parsed Lambda response:", parsed);
+        console.log("🧪 Full response from Lambda:", response);
+      } catch (e) {
+        throw new Error("❌ Failed to parse Lambda response: " + e.message);
+      }
+
+      const executionArn = parsed?.executionArn;
+      console.log("🧪 executionArn:", executionArn);
+
+      if (!executionArn) {
+        throw new Error("Lambda did not return executionArn.");
+      }
       console.log("🚀 Step function execution started:", executionArn);
-  
+
       // Poll for results
       const base64Excel = await pollForResult(executionArn);
-  
+
       // Convert base64 to Blob and create download link
       const byteCharacters = atob(base64Excel);
       const byteNumbers = Array.from(byteCharacters, (char) => char.charCodeAt(0));
@@ -111,7 +123,7 @@ function PdfUploader() {
       const blob = new Blob([byteArray], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
-  
+
       const url = window.URL.createObjectURL(blob);
       setDownloadLink(url);
       setUploaded(true);
@@ -119,10 +131,10 @@ function PdfUploader() {
       console.error("❌ Upload failed:", error);
       setError("Upload failed: " + (error.message || "Please try again."));
     }
-  
+
     setLoading(false);
   };
-  
+
 
   return (
     <Box sx={{ maxWidth: 800, mx: 'auto', p: 3, borderRadius: 4 }}>
