@@ -1,12 +1,7 @@
 import React, { useState } from "react";
 import {
-  Box,
-  Typography,
-  Button,
-  Paper,
-  CircularProgress,
-  Input,
-  Alert
+  Box, Typography, Button, Paper,
+  CircularProgress, Input, Alert
 } from "@mui/material";
 import { CloudUpload, Download } from "@mui/icons-material";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
@@ -24,7 +19,6 @@ function PdfUploader() {
 
   const handleFileChange = (event) => {
     const selected = event.target.files[0];
-    console.log("📂 Selected file:", selected);
     setFile(selected);
     setDownloadLink(null);
     setUploaded(false);
@@ -33,17 +27,20 @@ function PdfUploader() {
 
   const uploadToS3 = async (file) => {
     const key = `uploads/${Date.now()}-${file.name}`;
+    const params = {
+      Bucket: BUCKET,
+      Key: `public/${key}`,
+      Body: file,
+      ContentType: "application/pdf"
+    };
 
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: BUCKET,
-        Key: `public/${key}`,
-        Body: file, // ✅ RAW File object is fine now
-        ContentType: "application/pdf"
-      })
-    );
-
-    return key;
+    try {
+      await s3.send(new PutObjectCommand(params));
+      return key;
+    } catch (err) {
+      console.error("S3 Upload Error:", err);
+      throw new Error("S3 upload failed: " + err.message);
+    }
   };
 
   const triggerStepFunction = async (s3Key) => {
@@ -55,7 +52,6 @@ function PdfUploader() {
         s3Key: `public/${s3Key}`
       })
     });
-
     const data = await response.json();
     return data.executionArn;
   };
@@ -64,12 +60,10 @@ function PdfUploader() {
     for (let i = 0; i < retries; i++) {
       const res = await fetch(`${GET_RESULT_API}?executionArn=${encodeURIComponent(executionArn)}`);
       const data = await res.json();
-
       if (data?.signedUrl) return data.signedUrl;
-      await new Promise((resolve) => setTimeout(resolve, interval));
+      await new Promise(resolve => setTimeout(resolve, interval));
     }
-
-    throw new Error("❌ Timed out waiting for Excel result");
+    throw new Error("Timed out waiting for Excel result");
   };
 
   const handleUpload = async () => {
@@ -79,14 +73,8 @@ function PdfUploader() {
 
     try {
       const s3Key = await uploadToS3(file);
-      console.log("✅ Uploaded to S3:", s3Key);
-
       const executionArn = await triggerStepFunction(s3Key);
-      console.log("🚀 Step Function started:", executionArn);
-
       const signedUrl = await pollForResult(executionArn);
-      console.log("✅ Signed URL received:", signedUrl);
-
       setDownloadLink(signedUrl);
       setUploaded(true);
     } catch (err) {
@@ -100,20 +88,14 @@ function PdfUploader() {
   return (
     <Box sx={{ maxWidth: 800, mx: "auto", p: 3 }}>
       <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
-        Upload Medical PDF
+        Upload Medical PDF (30MB+ Supported)
       </Typography>
 
-      <Paper
-        elevation={3}
-        sx={{
-          p: 4,
-          mb: 4,
-          textAlign: "center",
-          border: "2px dashed #90caf9",
-          borderRadius: 3,
-          bgcolor: "#f7fbff"
-        }}
-      >
+      <Paper elevation={3} sx={{
+        p: 4, mb: 4, textAlign: "center",
+        border: "2px dashed #90caf9",
+        borderRadius: 3, bgcolor: "#f7fbff"
+      }}>
         <CloudUpload sx={{ fontSize: 48, color: "#2e7d32", mb: 1 }} />
         <Typography variant="subtitle1" mb={2}>
           Choose or drag a PDF file (up to 100MB)
@@ -135,11 +117,7 @@ function PdfUploader() {
           {loading ? <CircularProgress size={22} color="inherit" /> : "UPLOAD"}
         </Button>
 
-        {error && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {error}
-          </Alert>
-        )}
+        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
       </Paper>
 
       {uploaded && (
