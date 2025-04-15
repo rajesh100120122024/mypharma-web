@@ -59,74 +59,55 @@ function PdfUploader() {
     setProgress(0);
 
     try {
-      // Upload to S3 using Amplify Storage
-      console.log("📤 Uploading PDF to S3...");
       const fileName = `uploads/${Date.now()}-${file.name}`;
 
-      // Upload with progress tracking and checksum disabled
+      // Upload to S3 via Amplify Storage
       await uploadData({
         key: fileName,
         data: file,
         options: {
           accessLevel: 'guest',
           contentType: 'application/pdf',
-          // ✅ Disable checksum to avoid multipart error
           checksumAlgorithm: undefined,
           onProgress: (progress) => {
             const percentUploaded = Math.round((progress.loaded / progress.total) * 100);
             setProgress(percentUploaded);
-            console.log(`Upload progress: ${percentUploaded}%`);
+            console.log(`📤 Upload progress: ${percentUploaded}%`);
           }
         }
       });
 
-      console.log("✅ Upload complete, calling Lambda...");
+      console.log("✅ Upload complete. Starting Step Function...");
 
       // Call Lambda to start Step Function
-      const response = await post({
+      const lambdaResponse = await post({
         apiName: "pdfProcessor",
         path: "/start",
         options: {
           body: {
-            s3Bucket: 'pdf-upload-bucket-mypharma', // Your actual bucket name
+            s3Bucket: 'pdf-upload-bucket-mypharma',
             s3Key: fileName
           }
         }
       });
 
-      let parsed;
-      try {
-        const lambdaResponse = await response.response; // 🛠️ Await the response Promise
-        const rawBody = lambdaResponse.body;
+      console.log("📬 Lambda raw response:", lambdaResponse);
 
-        parsed = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;
-        console.log("✅ Parsed Lambda response:", parsed);
-        console.log("🧪 Full response from Lambda:", lambdaResponse);
-      } catch (e) {
-        throw new Error("❌ Failed to parse Lambda response: " + e.message);
-      }
+      const parsed = typeof lambdaResponse === 'string'
+        ? JSON.parse(lambdaResponse)
+        : lambdaResponse;
 
       const executionArn = parsed?.executionArn;
       console.log("🧪 executionArn:", executionArn);
 
       if (!executionArn) {
-        throw new Error("Lambda did not return executionArn.");
+        throw new Error("❌ Step Function did not return executionArn.");
       }
-      console.log("🚀 Step function execution started:", executionArn);
 
-      // Poll for results
-      const base64Excel = await pollForResult(executionArn);
+      const signedUrl = await pollForResult(executionArn);
+      console.log("✅ Received signed URL:", signedUrl);
 
-      // Convert base64 to Blob and create download link
-      const byteCharacters = atob(base64Excel);
-      const byteNumbers = Array.from(byteCharacters, (char) => char.charCodeAt(0));
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      });
-
-      const url = window.URL.createObjectURL(blob);
-      setDownloadLink(url);
+      setDownloadLink(signedUrl);
       setUploaded(true);
     } catch (error) {
       console.error("❌ Upload failed:", error);
@@ -135,7 +116,6 @@ function PdfUploader() {
 
     setLoading(false);
   };
-
 
   return (
     <Box sx={{ maxWidth: 800, mx: 'auto', p: 3, borderRadius: 4 }}>
@@ -234,6 +214,8 @@ function PdfUploader() {
             startIcon={<Download />}
             href={downloadLink}
             download="output.xlsx"
+            target="_blank"
+            rel="noopener noreferrer"
             sx={{
               borderRadius: '24px',
               fontWeight: 'bold',
