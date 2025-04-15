@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -6,66 +6,119 @@ import {
   Paper,
   CircularProgress,
   Input,
-  Alert
+  Alert,
+  Snackbar
 } from '@mui/material';
-import { CloudUpload, Download } from '@mui/icons-material';
+import { CloudUpload, Download, ErrorOutline } from '@mui/icons-material';
 import { post, get } from 'aws-amplify/api';
 import { uploadData } from 'aws-amplify/storage';
 import '../amplify'; // Your Amplify configuration
 
 function PdfUploader() {
+  // State management with more granular error tracking
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [downloadLink, setDownloadLink] = useState(null);
   const [uploaded, setUploaded] = useState(false);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState(0);
+  const [openSnackbar, setOpenSnackbar] = useState(false);
 
-  const handleFileChange = (event) => {
-    setFile(event.target.files[0]);
-    setDownloadLink(null);
-    setUploaded(false);
-    setError(null);
-    setProgress(0);
-  };
+  // Enhanced file change handler
+  const handleFileChange = useCallback((event) => {
+    const selectedFile = event.target.files[0];
+    
+    // Validate file type and size
+    if (selectedFile) {
+      if (selectedFile.type !== 'application/pdf') {
+        setError('Only PDF files are allowed');
+        setOpenSnackbar(true);
+        return;
+      }
 
+      // Optional: Add file size limit (e.g., 50MB)
+      const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+      if (selectedFile.size > MAX_FILE_SIZE) {
+        setError('File is too large. Maximum size is 50MB');
+        setOpenSnackbar(true);
+        return;
+      }
+
+      setFile(selectedFile);
+      setDownloadLink(null);
+      setUploaded(false);
+      setError(null);
+      setProgress(0);
+    }
+  }, []);
+
+  // Robust execution ARN retrieval
   const waitForExecutionArn = async (postOptions, maxRetries = 20, delay = 10000) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      console.log(`🌀 Attempt ${attempt} to fetch executionArn...`);
-
       try {
+        console.group(`📡 Execution ARN Retrieval - Attempt ${attempt}`);
+        console.log('API Call Options:', JSON.stringify(postOptions, null, 2));
+
+        // Perform API call
         const lambdaResponse = await post(postOptions);
+        
+        console.log('Raw Lambda Response:', JSON.stringify(lambdaResponse, null, 2));
 
-        let parsed;
-        if (typeof lambdaResponse === 'string') {
-          parsed = JSON.parse(lambdaResponse);
-        } else if (lambdaResponse?.body) {
-          parsed = typeof lambdaResponse.body === 'string'
-            ? JSON.parse(lambdaResponse.body)
-            : lambdaResponse.body;
-        } else {
-          parsed = lambdaResponse;
-        }
+        // Comprehensive response parsing
+        const parseResponse = (response) => {
+          // Handle different response formats
+          if (typeof response === 'string') {
+            try {
+              return JSON.parse(response);
+            } catch {
+              return { raw: response };
+            }
+          }
+          return response;
+        };
 
-        const executionArn = parsed?.executionArn;
-        console.log("🧪 executionArn:", executionArn);
+        const parsedResponse = parseResponse(lambdaResponse);
+        
+        // Multiple strategies to extract executionArn
+        const executionArn = 
+          parsedResponse?.executionArn || 
+          parsedResponse?.body?.executionArn || 
+          (typeof parsedResponse === 'string' 
+            ? JSON.parse(parsedResponse)?.executionArn 
+            : null);
+
+        console.log('Extracted Execution ARN:', executionArn);
+        console.groupEnd();
 
         if (executionArn) {
           return executionArn;
         }
+
+        console.warn(`No executionArn found in attempt ${attempt}`);
       } catch (error) {
-        console.warn(`⚠️ Error in attempt ${attempt}:`, error.message);
+        console.error(`API Call Error (Attempt ${attempt}):`, {
+          message: error.message,
+          name: error.name,
+          stack: error.stack,
+          response: error.response
+        });
+        console.groupEnd();
       }
 
+      // Wait before next retry
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
 
-    throw new Error("❌ executionArn not received after retries.");
+    throw new Error("❌ Failed to retrieve execution ARN after multiple attempts");
   };
 
+  // Enhanced polling for result
   const pollForResult = async (executionArn, retries = 15, interval = 10000) => {
     for (let i = 0; i < retries; i++) {
       try {
+        console.group(`🕰️ Polling for Result - Attempt ${i + 1}`);
+        console.log('Execution ARN:', executionArn);
+
         const res = await get({
           apiName: "stepFunctions",
           path: "/",
@@ -74,44 +127,75 @@ function PdfUploader() {
           }
         });
 
-        const signedUrl = res.body?.signedUrl || JSON.parse(res.body)?.signedUrl;
+        console.log('Step Functions Response:', JSON.stringify(res, null, 2));
+
+        const signedUrl = 
+          res.body?.signedUrl || 
+          (typeof res.body === 'string' ? JSON.parse(res.body)?.signedUrl : null);
+
+        console.log('Signed URL:', signedUrl);
+        console.groupEnd();
+
         if (signedUrl) {
           return signedUrl;
         }
       } catch (err) {
-        console.log("⏳ Still processing or failed:", err.message);
+        console.error('Polling Error:', {
+          message: err.message,
+          name: err.name,
+          stack: err.stack
+        });
+        console.groupEnd();
       }
+
+      // Wait before next poll
       await new Promise((resolve) => setTimeout(resolve, interval));
     }
-    throw new Error("❌ Step Function timed out or failed.");
+    throw new Error("❌ Step Function timed out or failed to generate result");
   };
 
+  // Main upload handler
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file) {
+      setError('Please select a PDF file');
+      setOpenSnackbar(true);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setProgress(0);
 
     try {
+      // Generate unique filename
       const fileName = `uploads/${Date.now()}-${file.name}`;
 
+      console.group('🚀 PDF Upload Process');
+      console.log('File Details:', {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        uploadPath: fileName
+      });
+
+      // S3 Upload
       await uploadData({
         key: fileName,
         data: file,
         options: {
           accessLevel: 'guest',
           contentType: 'application/pdf',
-          checksumAlgorithm: undefined,
           onProgress: (progress) => {
             const percentUploaded = Math.round((progress.loaded / progress.total) * 100);
+            console.log(`📤 Upload Progress: ${percentUploaded}%`);
             setProgress(percentUploaded);
-            console.log(`📤 Upload progress: ${percentUploaded}%`);
           }
         }
       });
 
-      console.log("✅ Upload complete. Starting Step Function...");
+      console.log('✅ S3 Upload Complete');
 
+      // Start Step Function
       const executionArn = await waitForExecutionArn({
         apiName: "pdfProcessor",
         path: "/start",
@@ -123,19 +207,38 @@ function PdfUploader() {
         }
       });
 
-      console.log("🚀 Step Function executionArn received:", executionArn);
+      console.log('🚀 Step Function Execution ARN:', executionArn);
 
+      // Poll for result
       const signedUrl = await pollForResult(executionArn);
-      console.log("✅ Received signed URL:", signedUrl);
+      
+      console.log('✅ Signed URL Received:', signedUrl);
+      console.groupEnd();
 
       setDownloadLink(signedUrl);
       setUploaded(true);
     } catch (error) {
-      console.error("❌ Upload failed:", error);
-      setError("Upload failed: " + (error.message || "Please try again."));
-    }
+      console.group('❌ Upload Error');
+      console.error('Detailed Error:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
+      console.groupEnd();
 
-    setLoading(false);
+      setError(`Upload failed: ${error.message || 'Unknown error'}`);
+      setOpenSnackbar(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Close snackbar handler
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setOpenSnackbar(false);
   };
 
   return (
@@ -220,12 +323,6 @@ function PdfUploader() {
             </Box>
           </Box>
         )}
-
-        {error && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {error}
-          </Alert>
-        )}
       </Paper>
 
       {uploaded && (
@@ -254,6 +351,23 @@ function PdfUploader() {
           </Button>
         </Box>
       )}
+
+      {/* Enhanced Error Handling Snackbar */}
+      <Snackbar
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        open={openSnackbar}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar}
+          severity="error" 
+          sx={{ width: '100%' }}
+          icon={<ErrorOutline />}
+        >
+          {error}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
