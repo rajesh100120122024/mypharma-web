@@ -29,7 +29,7 @@ function PdfUploader() {
     setProgress(0);
   };
 
-  const waitForExecutionArn = async (postOptions, maxRetries = 5, delay = 2000) => {
+  const waitForExecutionArn = async (postOptions, maxRetries = 20, delay = 10000) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       console.log(`🌀 Attempt ${attempt} to fetch executionArn...`);
 
