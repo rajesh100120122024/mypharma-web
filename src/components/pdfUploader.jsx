@@ -38,7 +38,7 @@ function PdfUploader() {
       new PutObjectCommand({
         Bucket: BUCKET,
         Key: `public/${key}`,
-        Body: file, // ✅ pass the raw File object
+        Body: file, // ✅ now safe
         ContentType: "application/pdf"
       })
     );
