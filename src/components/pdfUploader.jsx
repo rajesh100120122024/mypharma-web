@@ -35,17 +35,18 @@ function PdfUploader() {
 
     console.log("📬 Lambda resolved response:", response);
 
-    let body;
+    let bodyText = await response.text(); // ✅ handle ReadableStream
+    console.log("🧾 Lambda response text:", bodyText);
+
+    let parsed;
     try {
-      body = typeof response.body === 'string'
-        ? JSON.parse(response.body)
-        : response.body;
+      parsed = JSON.parse(bodyText);
     } catch (e) {
       console.error("❌ Failed to parse Lambda body:", e);
       throw new Error("Invalid Lambda response format");
     }
 
-    const executionArn = body?.executionArn;
+    const executionArn = parsed?.executionArn;
     console.log("🧪 Final executionArn:", executionArn);
 
     if (!executionArn) {
@@ -95,9 +96,13 @@ function PdfUploader() {
           contentType: 'application/pdf',
           checksumAlgorithm: undefined,
           onProgress: (progress) => {
-            const percentUploaded = Math.round((progress.loaded / progress.total) * 100);
-            setProgress(percentUploaded);
-            console.log(`📤 Upload progress: ${percentUploaded}%`);
+            if (progress.total) {
+              const percentUploaded = Math.round((progress.loaded / progress.total) * 100);
+              setProgress(percentUploaded);
+              console.log(`📤 Upload progress: ${percentUploaded}%`);
+            } else {
+              console.log("📤 Progress missing total size:", progress);
+            }
           }
         }
       });
