@@ -10,7 +10,7 @@ import { s3, BUCKET } from "../awsConfig";
 const START_API = "https://inordedh6h.execute-api.ap-south-1.amazonaws.com/Prod/start";
 // Create a proxy URL using a CORS proxy service
 const CORS_PROXY = "https://corsproxy.io/?";
-const GET_RESULT_API = "https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod/get";
+const GET_RESULT_API = "https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod";
 
 function PdfUploader() {
   const [file, setFile] = useState(null);
@@ -186,7 +186,9 @@ function PdfUploader() {
       console.log("File uploaded successfully, key:", s3Key);
       
       console.log("Triggering step function...");
+      console.log("executionArn...", executionArn);
       const executionArn = await triggerStepFunction(s3Key);
+      console.log("executionArn...", executionArn);
       setUploadProgress(60);
       console.log("Step function triggered, ARN:", executionArn);
       
