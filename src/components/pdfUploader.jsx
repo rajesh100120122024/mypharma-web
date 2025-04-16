@@ -8,8 +8,8 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { s3, BUCKET } from "../awsConfig";
 
 const START_API = "https://inordedh6h.execute-api.ap-south-1.amazonaws.com/Prod/start";
-// Create a proxy URL using a CORS proxy service
-const CORS_PROXY = "https://corsproxy.io/?";
+// We'll try a different CORS proxy that might work better
+const CORS_PROXY = "https://api.allorigins.win/raw?url=";
 const GET_RESULT_API = "https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod";
 
 function PdfUploader() {
@@ -94,20 +94,57 @@ function PdfUploader() {
   const pollForResult = async (executionArn, retries = 20, interval = 10000) => {
     console.log(`Starting polling for result with ARN: ${executionArn}`);
     
+    // Store the API usage approach we're currently using
+    // We'll try different approaches if one fails
+    let apiApproach = "direct"; // Start with direct API call
+    
     for (let i = 0; i < retries; i++) {
       try {
-        console.log(`Poll attempt ${i+1}/${retries}`);
+        console.log(`Poll attempt ${i+1}/${retries} using ${apiApproach} approach`);
         
-        // FIXED AGAIN: Construct the URL differently for corsproxy.io
-        // First, encode just the base API URL
-        const encodedBaseUrl = encodeURIComponent(GET_RESULT_API);
+        let res;
         
-        // Then add the executionArn as a separate parameter to the proxy URL itself
-        // This is a different approach than before - params go after the encoded URL
-        const proxyUrl = `${CORS_PROXY}${encodedBaseUrl}&executionArn=${encodeURIComponent(executionArn)}`;
-        console.log(`Polling URL: ${proxyUrl}`);
-        
-        const res = await fetch(proxyUrl);
+        if (apiApproach === "direct") {
+          // Try direct API call first - this might work if your API has CORS enabled
+          const directUrl = `${GET_RESULT_API}?executionArn=${encodeURIComponent(executionArn)}`;
+          console.log(`Trying direct request to: ${directUrl}`);
+          
+          try {
+            res = await fetch(directUrl, {
+              method: 'GET',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+              }
+            });
+            console.log(`Direct API call status: ${res.status}`);
+          } catch (err) {
+            console.warn("Direct API call failed, likely due to CORS:", err);
+            // Switch to proxy approach on next iteration
+            apiApproach = "proxy";
+            throw err; // Propagate error to trigger retry with new approach
+          }
+        } else if (apiApproach === "proxy") {
+          // Try with CORS proxy
+          const targetUrl = `${GET_RESULT_API}?executionArn=${encodeURIComponent(executionArn)}`;
+          const proxyUrl = `${CORS_PROXY}${encodeURIComponent(targetUrl)}`;
+          console.log(`Trying CORS proxy: ${proxyUrl}`);
+          
+          res = await fetch(proxyUrl);
+          console.log(`CORS proxy call status: ${res.status}`);
+        } else if (apiApproach === "post") {
+          // Try POST method as last resort
+          console.log(`Trying POST method to: ${GET_RESULT_API}`);
+          
+          res = await fetch(GET_RESULT_API, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ executionArn })
+          });
+          console.log(`POST method call status: ${res.status}`);
+        }
         
         if (!res.ok) {
           console.warn(`Poll attempt ${i+1}: API returned status ${res.status}`);
@@ -119,8 +156,31 @@ function PdfUploader() {
         // Handle response data - with better error handling
         let data;
         try {
+          // First check if the response is valid
+          if (!res.ok) {
+            console.warn(`Response not OK: ${res.status} ${res.statusText}`);
+            
+            // If we get a CORS error or 403/401 with direct approach, try another approach
+            if (apiApproach === "direct") {
+              apiApproach = "proxy";
+              console.log("Switching to proxy approach on next attempt");
+            } else if (apiApproach === "proxy") {
+              apiApproach = "post";
+              console.log("Switching to POST method approach on next attempt");
+            }
+            
+            throw new Error(`HTTP error: ${res.status}`);
+          }
+          
           const text = await res.text();
           console.log(`Raw response (first 100 chars): ${text.substring(0, 100)}...`);
+          
+          // Handle empty responses
+          if (!text || text.trim() === '') {
+            console.warn("Received empty response");
+            throw new Error("Empty response");
+          }
+          
           data = JSON.parse(text);
         } catch (parseError) {
           console.error("Failed to parse response:", parseError);
@@ -146,7 +206,6 @@ function PdfUploader() {
           const blob = base64ToBlob(data.base64Excel, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
           const url = URL.createObjectURL(blob);
           console.log("Created blob URL from base64 data");
-          console.log("Created blob URL from base64 data");
           return url;
         }
         
@@ -158,20 +217,24 @@ function PdfUploader() {
       } catch (err) {
         console.warn(`Poll attempt ${i+1} failed:`, err);
         
-        // If we've tried 5 times with the CORS proxy and it's still failing,
-        // try a different approach as fallback
-        if (i === 4) {
-          console.log("CORS proxy approach failed 5 times. Trying direct fetch with mode: 'no-cors'");
+        // Try switching approaches if one fails
+        if (apiApproach === "direct") {
+          apiApproach = "proxy";
+          console.log("Switching to proxy approach after error");
+        } else if (apiApproach === "proxy") {
+          apiApproach = "post";
+          console.log("Switching to POST method approach after error");
+        } else if (apiApproach === "post" && i >= 5) {
+          // If we've tried all approaches multiple times, try a more aggressive approach
+          console.log("All approaches failed multiple times. Trying with no-cors mode");
           try {
-            // Try a direct request with no-cors mode as fallback
-            // Note: This will yield an opaque response that can't be read,
-            // but it might trigger the Lambda to process
+            // This is a last resort - just try to hit the Lambda even if we can't read the response
+            // It might at least trigger the processing
             const directUrl = `${GET_RESULT_API}?executionArn=${encodeURIComponent(executionArn)}`;
-            console.log(`Trying direct request to: ${directUrl}`);
             await fetch(directUrl, { mode: 'no-cors' });
-            console.log("Direct request sent (no response expected due to CORS)");
+            console.log("no-cors request sent (response can't be read)");
           } catch (directErr) {
-            console.warn("Direct request also failed:", directErr);
+            console.warn("no-cors request also failed:", directErr);
           }
         }
       }
