@@ -186,8 +186,9 @@ function PdfUploader() {
       console.log("File uploaded successfully, key:", s3Key);
       
       console.log("Triggering step function...");
-      console.log("executionArn...", executionArn);
+      
       const executionArn = await triggerStepFunction(s3Key);
+      console.log("executionArn...", executionArn);
       console.log("executionArn...", executionArn);
       setUploadProgress(60);
       console.log("Step function triggered, ARN:", executionArn);
