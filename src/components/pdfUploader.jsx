@@ -45,19 +45,19 @@ function PdfUploader() {
         ContentType: "application/pdf"
       };
 
-      console.log(`Uploading file to S3: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`);
+      // console.log(`Uploading file to S3: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`);
       await s3.send(new PutObjectCommand(params));
-      console.log("S3 upload completed successfully");
+      // console.log("S3 upload completed successfully");
       return key;
     } catch (err) {
-      console.error("S3 Upload Error:", err);
+      // console.error("S3 Upload Error:", err);
       throw new Error(`S3 upload failed: ${err.message}`);
     }
   };
 
   const triggerStepFunction = async (s3Key) => {
     try {
-      console.log("Triggering Step Function with S3 key:", s3Key);
+      // console.log("Triggering Step Function with S3 key:", s3Key);
       
       // Add a small delay to ensure S3 consistency
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -73,12 +73,12 @@ function PdfUploader() {
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("API Error Response:", errorText);
+        // console.error("API Error Response:", errorText);
         throw new Error(`API returned status ${response.status}: ${errorText}`);
       }
       
       const data = await response.json();
-      console.log("Step Function Response:", data);
+      // console.log("Step Function Response:", data);
       
       if (!data.executionArn) {
         throw new Error("No executionArn returned from API");
@@ -86,13 +86,13 @@ function PdfUploader() {
       
       return data.executionArn;
     } catch (err) {
-      console.error("Step Function Error:", err);
+      // console.error("Step Function Error:", err);
       throw new Error(`Failed to start processing: ${err.message}`);
     }
   };
 
   const pollForResult = async (executionArn, retries = 20, interval = 10000) => {
-    console.log(`Starting polling for result with ARN: ${executionArn}`);
+    // console.log(`Starting polling for result with ARN: ${executionArn}`);
     
     // Store the API usage approach we're currently using
     // We'll try different approaches if one fails
@@ -100,14 +100,14 @@ function PdfUploader() {
     
     for (let i = 0; i < retries; i++) {
       try {
-        console.log(`Poll attempt ${i+1}/${retries} using ${apiApproach} approach`);
+        // console.log(`Poll attempt ${i+1}/${retries} using ${apiApproach} approach`);
         
         let res;
         
         if (apiApproach === "direct") {
           // Try direct API call first - this might work if your API has CORS enabled
           const directUrl = `${GET_RESULT_API}?executionArn=${encodeURIComponent(executionArn)}`;
-          console.log(`Trying direct request to: ${directUrl}`);
+          // console.log(`Trying direct request to: ${directUrl}`);
           
           try {
             res = await fetch(directUrl, {
@@ -117,9 +117,9 @@ function PdfUploader() {
                 'Content-Type': 'application/json'
               }
             });
-            console.log(`Direct API call status: ${res.status}`);
+            // console.log(`Direct API call status: ${res.status}`);
           } catch (err) {
-            console.warn("Direct API call failed, likely due to CORS:", err);
+            // console.warn("Direct API call failed, likely due to CORS:", err);
             // Switch to proxy approach on next iteration
             apiApproach = "proxy";
             throw err; // Propagate error to trigger retry with new approach
@@ -128,13 +128,13 @@ function PdfUploader() {
           // Try with CORS proxy
           const targetUrl = `${GET_RESULT_API}?executionArn=${encodeURIComponent(executionArn)}`;
           const proxyUrl = `${CORS_PROXY}${encodeURIComponent(targetUrl)}`;
-          console.log(`Trying CORS proxy: ${proxyUrl}`);
+          // console.log(`Trying CORS proxy: ${proxyUrl}`);
           
           res = await fetch(proxyUrl);
-          console.log(`CORS proxy call status: ${res.status}`);
+          // console.log(`CORS proxy call status: ${res.status}`);
         } else if (apiApproach === "post") {
           // Try POST method as last resort
-          console.log(`Trying POST method to: ${GET_RESULT_API}`);
+          // console.log(`Trying POST method to: ${GET_RESULT_API}`);
           
           res = await fetch(GET_RESULT_API, {
             method: 'POST',
@@ -143,11 +143,11 @@ function PdfUploader() {
             },
             body: JSON.stringify({ executionArn })
           });
-          console.log(`POST method call status: ${res.status}`);
+          // console.log(`POST method call status: ${res.status}`);
         }
         
         if (!res.ok) {
-          console.warn(`Poll attempt ${i+1}: API returned status ${res.status}`);
+          // console.warn(`Poll attempt ${i+1}: API returned status ${res.status}`);
           setProcessingStatus(`Processing... (attempt ${i+1}/${retries})`);
           await new Promise(resolve => setTimeout(resolve, interval));
           continue;
@@ -158,37 +158,37 @@ function PdfUploader() {
         try {
           // First check if the response is valid
           if (!res.ok) {
-            console.warn(`Response not OK: ${res.status} ${res.statusText}`);
+            // console.warn(`Response not OK: ${res.status} ${res.statusText}`);
             
             // If we get a CORS error or 403/401 with direct approach, try another approach
             if (apiApproach === "direct") {
               apiApproach = "proxy";
-              console.log("Switching to proxy approach on next attempt");
+              // console.log("Switching to proxy approach on next attempt");
             } else if (apiApproach === "proxy") {
               apiApproach = "post";
-              console.log("Switching to POST method approach on next attempt");
+              // console.log("Switching to POST method approach on next attempt");
             }
             
             throw new Error(`HTTP error: ${res.status}`);
           }
           
           const text = await res.text();
-          console.log(`Raw response (first 100 chars): ${text.substring(0, 100)}...`);
+          // console.log(`Raw response (first 100 chars): ${text.substring(0, 100)}...`);
           
           // Handle empty responses
           if (!text || text.trim() === '') {
-            console.warn("Received empty response");
+            // console.warn("Received empty response");
             throw new Error("Empty response");
           }
           
           data = JSON.parse(text);
         } catch (parseError) {
-          console.error("Failed to parse response:", parseError);
+          // console.error("Failed to parse response:", parseError);
           await new Promise(resolve => setTimeout(resolve, interval));
           continue;
         }
         
-        console.log(`Poll attempt ${i+1} response:`, data);
+        // console.log(`Poll attempt ${i+1} response:`, data);
         
         if (data?.status === "RUNNING") {
           setProcessingStatus(`PDF processing in progress... (attempt ${i+1}/${retries})`);
@@ -197,7 +197,7 @@ function PdfUploader() {
         }
         
         if (data?.signedUrl) {
-          console.log("Received signed URL:", data.signedUrl);
+          // console.log("Received signed URL:", data.signedUrl);
           return data.signedUrl;
         }
         
@@ -205,7 +205,7 @@ function PdfUploader() {
           // If we receive base64 Excel data, create a download link
           const blob = base64ToBlob(data.base64Excel, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
           const url = URL.createObjectURL(blob);
-          console.log("Created blob URL from base64 data");
+          // console.log("Created blob URL from base64 data");
           return url;
         }
         
@@ -213,28 +213,28 @@ function PdfUploader() {
           throw new Error(`Processing error: ${data.error}`);
         }
         
-        console.log(`Poll attempt ${i+1}: Still processing...`);
+        // console.log(`Poll attempt ${i+1}: Still processing...`);
       } catch (err) {
-        console.warn(`Poll attempt ${i+1} failed:`, err);
+        // console.warn(`Poll attempt ${i+1} failed:`, err);
         
         // Try switching approaches if one fails
         if (apiApproach === "direct") {
           apiApproach = "proxy";
-          console.log("Switching to proxy approach after error");
+          // console.log("Switching to proxy approach after error");
         } else if (apiApproach === "proxy") {
           apiApproach = "post";
-          console.log("Switching to POST method approach after error");
+          // console.log("Switching to POST method approach after error");
         } else if (apiApproach === "post" && i >= 5) {
           // If we've tried all approaches multiple times, try a more aggressive approach
-          console.log("All approaches failed multiple times. Trying with no-cors mode");
+          // console.log("All approaches failed multiple times. Trying with no-cors mode");
           try {
             // This is a last resort - just try to hit the Lambda even if we can't read the response
             // It might at least trigger the processing
             const directUrl = `${GET_RESULT_API}?executionArn=${encodeURIComponent(executionArn)}`;
             await fetch(directUrl, { mode: 'no-cors' });
-            console.log("no-cors request sent (response can't be read)");
+            // console.log("no-cors request sent (response can't be read)");
           } catch (directErr) {
-            console.warn("no-cors request also failed:", directErr);
+            // console.warn("no-cors request also failed:", directErr);
           }
         }
       }
@@ -273,29 +273,29 @@ function PdfUploader() {
     setProcessingStatus("");
 
     try {
-      console.log("Starting upload process for file:", file.name);
+      // console.log("Starting upload process for file:", file.name);
       setUploadProgress(10);
       
       const s3Key = await uploadToS3(file);
       setUploadProgress(40);
-      console.log("File uploaded successfully, key:", s3Key);
+      // console.log("File uploaded successfully, key:", s3Key);
       
-      console.log("Triggering step function...");
+      // console.log("Triggering step function...");
       
       const executionArn = await triggerStepFunction(s3Key);
       setUploadProgress(60);
-      console.log("Step function triggered, ARN:", executionArn);
+      // console.log("Step function triggered, ARN:", executionArn);
       
       setProcessingStatus("Processing PDF, please wait...");
-      console.log("Polling for results...");
+      // console.log("Polling for results...");
       const signedUrl = await pollForResult(executionArn);
       setUploadProgress(100);
-      console.log("Got URL for download:", signedUrl);
+      // console.log("Got URL for download:", signedUrl);
       
       setDownloadLink(signedUrl);
       setUploaded(true);
     } catch (err) {
-      console.error("❌ Upload failed:", err);
+      // console.error("❌ Upload failed:", err);
       setError(`Upload failed: ${err.message}`);
     } finally {
       setLoading(false);
