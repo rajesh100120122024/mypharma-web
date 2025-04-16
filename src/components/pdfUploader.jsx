@@ -146,6 +146,7 @@ function PdfUploader() {
           const blob = base64ToBlob(data.base64Excel, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
           const url = URL.createObjectURL(blob);
           console.log("Created blob URL from base64 data");
+          console.log("Created blob URL from base64 data");
           return url;
         }
         
