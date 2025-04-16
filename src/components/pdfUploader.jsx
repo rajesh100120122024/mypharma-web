@@ -98,13 +98,13 @@ function PdfUploader() {
       try {
         console.log(`Poll attempt ${i+1}/${retries}`);
         
-        // FIXED: Properly construct the URL for the CORS proxy
-        // First, build the API URL with the executionArn parameter
-        const apiUrl = new URL(GET_RESULT_API);
-        apiUrl.searchParams.append("executionArn", executionArn);
+        // FIXED AGAIN: Construct the URL differently for corsproxy.io
+        // First, encode just the base API URL
+        const encodedBaseUrl = encodeURIComponent(GET_RESULT_API);
         
-        // Then encode this URL for the CORS proxy
-        const proxyUrl = `${CORS_PROXY}${encodeURIComponent(apiUrl.toString())}`;
+        // Then add the executionArn as a separate parameter to the proxy URL itself
+        // This is a different approach than before - params go after the encoded URL
+        const proxyUrl = `${CORS_PROXY}${encodedBaseUrl}&executionArn=${encodeURIComponent(executionArn)}`;
         console.log(`Polling URL: ${proxyUrl}`);
         
         const res = await fetch(proxyUrl);
@@ -116,7 +116,18 @@ function PdfUploader() {
           continue;
         }
         
-        const data = await res.json();
+        // Handle response data - with better error handling
+        let data;
+        try {
+          const text = await res.text();
+          console.log(`Raw response (first 100 chars): ${text.substring(0, 100)}...`);
+          data = JSON.parse(text);
+        } catch (parseError) {
+          console.error("Failed to parse response:", parseError);
+          await new Promise(resolve => setTimeout(resolve, interval));
+          continue;
+        }
+        
         console.log(`Poll attempt ${i+1} response:`, data);
         
         if (data?.status === "RUNNING") {
@@ -145,6 +156,23 @@ function PdfUploader() {
         console.log(`Poll attempt ${i+1}: Still processing...`);
       } catch (err) {
         console.warn(`Poll attempt ${i+1} failed:`, err);
+        
+        // If we've tried 5 times with the CORS proxy and it's still failing,
+        // try a different approach as fallback
+        if (i === 4) {
+          console.log("CORS proxy approach failed 5 times. Trying direct fetch with mode: 'no-cors'");
+          try {
+            // Try a direct request with no-cors mode as fallback
+            // Note: This will yield an opaque response that can't be read,
+            // but it might trigger the Lambda to process
+            const directUrl = `${GET_RESULT_API}?executionArn=${encodeURIComponent(executionArn)}`;
+            console.log(`Trying direct request to: ${directUrl}`);
+            await fetch(directUrl, { mode: 'no-cors' });
+            console.log("Direct request sent (no response expected due to CORS)");
+          } catch (directErr) {
+            console.warn("Direct request also failed:", directErr);
+          }
+        }
       }
       
       await new Promise(resolve => setTimeout(resolve, interval));
