@@ -8,6 +8,8 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { s3, BUCKET } from "../awsConfig";
 
 const START_API = "https://inordedh6h.execute-api.ap-south-1.amazonaws.com/Prod/start";
+// Create a proxy URL using a CORS proxy service
+const CORS_PROXY = "https://corsproxy.io/?";
 const GET_RESULT_API = "https://zo1cswzvkg.execute-api.ap-south-1.amazonaws.com/prod/get";
 
 function PdfUploader() {
@@ -17,6 +19,7 @@ function PdfUploader() {
   const [downloadLink, setDownloadLink] = useState(null);
   const [uploaded, setUploaded] = useState(false);
   const [error, setError] = useState(null);
+  const [processingStatus, setProcessingStatus] = useState("");
 
   const handleFileChange = (event) => {
     const selected = event.target.files[0];
@@ -25,23 +28,15 @@ function PdfUploader() {
     setUploaded(false);
     setError(null);
     setUploadProgress(0);
-  };
-
-  const readFileAsArrayBuffer = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = (error) => reject(error);
-      reader.readAsArrayBuffer(file);
-    });
+    setProcessingStatus("");
   };
 
   const uploadToS3 = async (file) => {
     const key = `uploads/${Date.now()}-${file.name}`;
     
     try {
-      // Convert file to ArrayBuffer using FileReader API (more compatible than file.arrayBuffer())
-      const fileArrayBuffer = await readFileAsArrayBuffer(file);
+      // Convert file to ArrayBuffer for better compatibility
+      const fileArrayBuffer = await file.arrayBuffer();
       
       const params = {
         Bucket: BUCKET,
@@ -56,13 +51,17 @@ function PdfUploader() {
       return key;
     } catch (err) {
       console.error("S3 Upload Error:", err);
-      throw new Error(`S3 upload failed: ${err.message || "Unknown error"}`);
+      throw new Error(`S3 upload failed: ${err.message}`);
     }
   };
 
   const triggerStepFunction = async (s3Key) => {
     try {
       console.log("Triggering Step Function with S3 key:", s3Key);
+      
+      // Add a small delay to ensure S3 consistency
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       const response = await fetch(START_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -88,27 +87,28 @@ function PdfUploader() {
       return data.executionArn;
     } catch (err) {
       console.error("Step Function Error:", err);
-      throw new Error(`Failed to start processing: ${err.message || "Unknown error"}`);
+      throw new Error(`Failed to start processing: ${err.message}`);
     }
   };
 
   const pollForResult = async (executionArn, retries = 20, interval = 10000) => {
     console.log(`Starting polling for result with ARN: ${executionArn}`);
-    console.log(`Will poll ${retries} times with ${interval}ms interval`);
     
     for (let i = 0; i < retries; i++) {
       try {
         console.log(`Poll attempt ${i+1}/${retries}`);
         
-        const url = `${GET_RESULT_API}?executionArn=${encodeURIComponent(executionArn)}`;
-        console.log(`Polling URL: ${url}`);
+        // Use a CORS proxy to avoid CORS issues
+        const encodedUrl = encodeURIComponent(`${GET_RESULT_API}?executionArn=${encodeURIComponent(executionArn)}`);
+        const proxyUrl = `${CORS_PROXY}${encodedUrl}`;
         
-        const res = await fetch(url);
+        console.log(`Polling URL: ${proxyUrl}`);
+        
+        const res = await fetch(proxyUrl);
         
         if (!res.ok) {
           console.warn(`Poll attempt ${i+1}: API returned status ${res.status}`);
-          const errorText = await res.text();
-          console.error("Poll Error Response:", errorText);
+          setProcessingStatus(`Processing... (attempt ${i+1}/${retries})`);
           await new Promise(resolve => setTimeout(resolve, interval));
           continue;
         }
@@ -116,9 +116,27 @@ function PdfUploader() {
         const data = await res.json();
         console.log(`Poll attempt ${i+1} response:`, data);
         
+        if (data?.status === "RUNNING") {
+          setProcessingStatus(`PDF processing in progress... (attempt ${i+1}/${retries})`);
+          await new Promise(resolve => setTimeout(resolve, interval));
+          continue;
+        }
+        
         if (data?.signedUrl) {
           console.log("Received signed URL:", data.signedUrl);
           return data.signedUrl;
+        }
+        
+        if (data?.base64Excel) {
+          // If we receive base64 Excel data, create a download link
+          const blob = base64ToBlob(data.base64Excel, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+          const url = URL.createObjectURL(blob);
+          console.log("Created blob URL from base64 data");
+          return url;
+        }
+        
+        if (data?.error) {
+          throw new Error(`Processing error: ${data.error}`);
         }
         
         console.log(`Poll attempt ${i+1}: Still processing...`);
@@ -128,7 +146,28 @@ function PdfUploader() {
       
       await new Promise(resolve => setTimeout(resolve, interval));
     }
-    throw new Error("Timed out waiting for Excel result");
+    
+    throw new Error("Timed out waiting for Excel result. Your file is still processing and may be available shortly.");
+  };
+  
+  // Helper function to convert base64 to blob
+  const base64ToBlob = (base64, mimeType) => {
+    const byteCharacters = atob(base64);
+    const byteArrays = [];
+    
+    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+      const slice = byteCharacters.slice(offset, offset + 512);
+      const byteNumbers = new Array(slice.length);
+      
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+      
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+    
+    return new Blob(byteArrays, { type: mimeType });
   };
 
   const handleUpload = async () => {
@@ -136,6 +175,7 @@ function PdfUploader() {
     setLoading(true);
     setError(null);
     setUploadProgress(0);
+    setProcessingStatus("");
 
     try {
       console.log("Starting upload process for file:", file.name);
@@ -150,16 +190,17 @@ function PdfUploader() {
       setUploadProgress(60);
       console.log("Step function triggered, ARN:", executionArn);
       
+      setProcessingStatus("Processing PDF, please wait...");
       console.log("Polling for results...");
       const signedUrl = await pollForResult(executionArn);
       setUploadProgress(100);
-      console.log("Got signed URL for download:", signedUrl);
+      console.log("Got URL for download:", signedUrl);
       
       setDownloadLink(signedUrl);
       setUploaded(true);
     } catch (err) {
       console.error("❌ Upload failed:", err);
-      setError(`Upload failed: ${err.message || "Unknown error"}`);
+      setError(`Upload failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -201,9 +242,10 @@ function PdfUploader() {
         {loading && (
           <Box sx={{ width: '100%', mt: 2 }}>
             <Typography variant="body2" sx={{ mb: 1 }}>
-              {uploadProgress < 40 ? "Uploading to storage..." : 
+              {uploadProgress < 20 ? "Preparing upload..." :
+               uploadProgress < 40 ? "Uploading to storage..." : 
                uploadProgress < 60 ? "Starting conversion process..." : 
-               uploadProgress < 100 ? "Processing PDF, please wait..." : 
+               uploadProgress < 100 ? processingStatus || "Processing PDF, please wait..." : 
                "Finalizing..."}
             </Typography>
             <Box 
@@ -231,7 +273,11 @@ function PdfUploader() {
           </Box>
         )}
 
-        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+        {error && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
+        )}
         
         {file && !loading && !uploaded && (
           <Typography variant="body2" sx={{ mt: 2 }}>
