@@ -98,10 +98,13 @@ function PdfUploader() {
       try {
         console.log(`Poll attempt ${i+1}/${retries}`);
         
-        // Use a CORS proxy to avoid CORS issues
-        const encodedUrl = encodeURIComponent(`${GET_RESULT_API}?executionArn=${encodeURIComponent(executionArn)}`);
-        const proxyUrl = `${CORS_PROXY}${encodedUrl}`;
-        console.log(`encodedUrl: ${encodedUrl}`);
+        // FIXED: Properly construct the URL for the CORS proxy
+        // First, build the API URL with the executionArn parameter
+        const apiUrl = new URL(GET_RESULT_API);
+        apiUrl.searchParams.append("executionArn", executionArn);
+        
+        // Then encode this URL for the CORS proxy
+        const proxyUrl = `${CORS_PROXY}${encodeURIComponent(apiUrl.toString())}`;
         console.log(`Polling URL: ${proxyUrl}`);
         
         const res = await fetch(proxyUrl);
@@ -188,8 +191,6 @@ function PdfUploader() {
       console.log("Triggering step function...");
       
       const executionArn = await triggerStepFunction(s3Key);
-      console.log("executionArn...", executionArn);
-      console.log("executionArn...", executionArn);
       setUploadProgress(60);
       console.log("Step function triggered, ARN:", executionArn);
       
