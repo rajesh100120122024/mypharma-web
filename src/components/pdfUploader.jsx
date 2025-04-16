@@ -101,7 +101,7 @@ function PdfUploader() {
         // Use a CORS proxy to avoid CORS issues
         const encodedUrl = encodeURIComponent(`${GET_RESULT_API}?executionArn=${encodeURIComponent(executionArn)}`);
         const proxyUrl = `${CORS_PROXY}${encodedUrl}`;
-        
+        console.log(`encodedUrl: ${encodedUrl}`);
         console.log(`Polling URL: ${proxyUrl}`);
         
         const res = await fetch(proxyUrl);
