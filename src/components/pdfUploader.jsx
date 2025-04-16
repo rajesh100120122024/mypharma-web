@@ -92,7 +92,7 @@ function PdfUploader() {
     }
   };
 
-  const pollForResult = async (executionArn, retries = 15, interval = 10000) => {
+  const pollForResult = async (executionArn, retries = 20, interval = 10000) => {
     console.log(`Starting polling for result with ARN: ${executionArn}`);
     console.log(`Will poll ${retries} times with ${interval}ms interval`);
     
