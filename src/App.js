@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Box, Typography, List, ListItem, ListItemText } from '@mui/material';
 import PdfUploader from './components/pdfUploader';
 import ChatBox from './components/chatBox';
+import UpdatePatientData from './components/updatePatientData';
 
 function App() {
   const [selectedTab, setSelectedTab] = useState('PDF Uploader');
@@ -12,6 +13,9 @@ function App() {
         return <PdfUploader />;
       case 'Chat with Assistant':
         return <ChatBox />;
+      case 'UpdatePatientData':
+        return <UpdatePatientData />;
+        
       case 'Settings':
         return <Typography variant="h6">⚙️ Settings - Coming soon!</Typography>;
       default:
@@ -52,7 +56,7 @@ function App() {
           </Box>
 
           <List>
-            {['PDF Uploader', 'Chat with Assistant', 'Settings'].map((text) => (
+            {['PDF Uploader', 'Chat with Assistant', 'UpdatePatientData', 'Settings'].map((text) => (
               <ListItem
                 button
                 key={text}
