@@ -5,6 +5,7 @@ import axios from 'axios';
 const UpdatePatientData = () => {
   const [mainPdf, setMainPdf] = useState(null);
   const [supportPdfs, setSupportPdfs] = useState([]);
+  const [extraPdf, setExtraPdf] = useState(null); // New state for extra document
 
   const handleSubmit = async () => {
     if (!mainPdf) {
@@ -17,6 +18,10 @@ const UpdatePatientData = () => {
 
     for (let i = 0; i < supportPdfs.length; i++) {
       formData.append('supportPdfs', supportPdfs[i]);
+    }
+
+    if (extraPdf) {
+      formData.append('extraPdf', extraPdf); // Include extra document if exists
     }
 
     try {
@@ -56,7 +61,7 @@ const UpdatePatientData = () => {
         />
       </Box>
 
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: 3 }}>
         <InputLabel sx={{ fontWeight: 'bold', color: '#333', mb: 1 }}>
           Supporting Documents (PDF)
         </InputLabel>
@@ -65,6 +70,17 @@ const UpdatePatientData = () => {
           accept="application/pdf"
           multiple
           onChange={(e) => setSupportPdfs([...e.target.files])}
+        />
+      </Box>
+
+      <Box sx={{ mb: 4 }}>
+        <InputLabel sx={{ fontWeight: 'bold', color: '#333', mb: 1 }}>
+          Extra PDF Document
+        </InputLabel>
+        <input
+          type="file"
+          accept="application/pdf"
+          onChange={(e) => setExtraPdf(e.target.files[0])}
         />
       </Box>
 
