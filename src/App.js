@@ -9,7 +9,7 @@ function App() {
 
   const renderContent = () => {
     switch (selectedTab) {
-      case 'PDF Uploader':
+      case 'PDF Uploader For MedicalCoders':
         return <PdfUploader />;
       case 'Chat with Assistant':
         return <ChatBox />;
