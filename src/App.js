@@ -9,7 +9,7 @@ function App() {
 
   const renderContent = () => {
     switch (selectedTab) {
-      case 'PDF Uploader For MedicalCoders':
+      case 'PDF Uploader':
         return <PdfUploader />;
       case 'Chat with Assistant':
         return <ChatBox />;
@@ -56,7 +56,7 @@ function App() {
           </Box>
 
           <List>
-            {['PDF Uploader', 'Chat with Assistant', 'UpdatePatientData', 'Settings'].map((text) => (
+            {['PDF Uploader For MedicalCoders', 'Chat with Assistant', 'UpdatePatientData', 'Settings'].map((text) => (
               <ListItem
                 button
                 key={text}
