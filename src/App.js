@@ -3,6 +3,7 @@ import { Box, Typography, List, ListItem, ListItemText } from '@mui/material';
 import PdfUploader from './components/pdfUploader';
 import ChatBox from './components/chatBox';
 import UpdatePatientData from './components/updatePatientData';
+import PostDischargeAssistant from './components/postDischargeAssistant';
 
 function App() {
   const [selectedTab, setSelectedTab] = useState('PDF Uploader');
@@ -15,7 +16,8 @@ function App() {
         return <ChatBox />;
       case 'UpdatePatientData':
         return <UpdatePatientData />;
-        
+      case 'Post-Discharge Care Assistant': // ✅ New case
+        return <PostDischargeAssistant />;  
       case 'Settings':
         return <Typography variant="h6">⚙️ Settings - Coming soon!</Typography>;
       default:
@@ -56,7 +58,7 @@ function App() {
           </Box>
 
           <List>
-            {['PDF Uploader For MedicalCoders', 'Chat with Assistant', 'UpdatePatientData', 'Settings'].map((text) => (
+            {['PDF Uploader For MedicalCoders', 'Chat with Assistant', 'UpdatePatientData', 'Post-Discharge Care Assistant', 'Settings'].map((text) => (
               <ListItem
                 button
                 key={text}
