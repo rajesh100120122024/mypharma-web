@@ -20,7 +20,7 @@ function PostDischargeAssistant() {
 
     for (const file of files) {
       // 1️⃣ Get presigned URL for each file
-      const presignedRes = await fetch('/api/getPresignedUrl', {
+      const presignedRes = await fetch('/api-server/getPresignedUrl.js', {
         method: 'POST',
         body: JSON.stringify({
           fileName: file.name,
