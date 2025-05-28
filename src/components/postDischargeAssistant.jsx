@@ -2,51 +2,57 @@ import React from 'react';
 import { Box, Typography, Button, TextField, CircularProgress } from '@mui/material';
 
 function PostDischargeAssistant() {
-  const [file, setFile] = React.useState(null);
+  const [files, setFiles] = React.useState([]); // ✅ Array for multiple files
   const [question, setQuestion] = React.useState('');
   const [answer, setAnswer] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [fileUploaded, setFileUploaded] = React.useState(false);
 
+  // ✅ File selection handler
+  const handleFileSelect = (e) => {
+    setFiles(Array.from(e.target.files)); // convert FileList to array
+  };
+
   // ✅ Upload handler
-  const handleFileUpload = async (e) => {
-    const selectedFile = e.target.files[0];
-    setFile(selectedFile);
+  const handleFileUpload = async () => {
+    if (files.length === 0) return alert('Please select at least one file to upload.');
+    setLoading(true);
 
-    if (!selectedFile) return;
+    for (const file of files) {
+      // 1️⃣ Get presigned URL for each file
+      const presignedRes = await fetch('/api/getPresignedUrl', {
+        method: 'POST',
+        body: JSON.stringify({
+          fileName: file.name,
+          bucket: 'pdf-upload-bucket-mypharma',
+          keyPrefix: 'uploadDischargeDocuments/user1/',
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const { url, key } = await presignedRes.json();
 
-    // 1️⃣ Get a presigned URL from your backend
-    const presignedRes = await fetch('/api/getPresignedUrl', {
-      method: 'POST',
-      body: JSON.stringify({
-        fileName: selectedFile.name,
-        bucket: 'pdf-upload-bucket-mypharma',
-        keyPrefix: 'uploadDischargeDocuments/user1/',
-      }),
-      headers: { 'Content-Type': 'application/json' },
-    });
-    const { url, key } = await presignedRes.json();
+      // 2️⃣ Upload file to S3
+      await fetch(url, {
+        method: 'PUT',
+        body: file,
+      });
 
-    // 2️⃣ Upload the file to S3 using the presigned URL
-    await fetch(url, {
-      method: 'PUT',
-      body: selectedFile,
-    });
+      // 3️⃣ Tell backend to process uploaded file (create embeddings)
+      await fetch('/api/postDischargeAssistant', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'upload',
+          bucket: 'pdf-upload-bucket-mypharma',
+          key: key,
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
-    // 3️⃣ Tell backend to process the file (store embeddings)
-    await fetch('/api/postDischargeAssistant', {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'upload',
-        bucket: 'pdf-upload-bucket-mypharma',
-        key: key,
-      }),
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    // 4️⃣ Show success message
+    // 4️⃣ Show success
+    setLoading(false);
     setFileUploaded(true);
-    alert('File uploaded and processed successfully! You can now ask questions.');
+    alert('Files uploaded and processed successfully! You can now ask questions.');
   };
 
   // ✅ Question handler
@@ -75,8 +81,21 @@ function PostDischargeAssistant() {
 
       {/* ✅ File Upload */}
       <Box sx={{ my: 2 }}>
-        <Typography variant="subtitle1">Upload Discharge Summary</Typography>
-        <input type="file" accept=".pdf,.txt" onChange={handleFileUpload} />
+        <Typography variant="subtitle1">Upload Discharge Summaries</Typography>
+        <input
+          type="file"
+          accept=".pdf,.txt"
+          multiple
+          onChange={handleFileSelect}
+        />
+        <Button
+          variant="contained"
+          sx={{ mt: 1 }}
+          onClick={handleFileUpload}
+          disabled={loading || files.length === 0}
+        >
+          {loading ? <CircularProgress size={24} /> : 'Upload'}
+        </Button>
       </Box>
 
       {/* ✅ Ask Questions only if file is uploaded */}
