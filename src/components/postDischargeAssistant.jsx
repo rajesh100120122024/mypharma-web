@@ -22,10 +22,17 @@ function PostDischargeAssistant() {
 
     try {
       for (const file of files) {
-        const arrayBuffer = await file.arrayBuffer();
-        const base64String = btoa(
-          String.fromCharCode(...new Uint8Array(arrayBuffer))
-        );
+        // Read file as base64 using FileReader
+        const base64String = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            // reader.result is "data:<mime>;base64,<data>"
+            const [, b64] = reader.result.split(',');
+            resolve(b64);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
 
         await fetch('https://07w4hdreje.execute-api.ap-south-1.amazonaws.com/DEV', {
           method: 'POST',
