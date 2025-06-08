@@ -1,8 +1,7 @@
 import React from 'react';
 import { Box, Typography, Button, TextField, CircularProgress } from '@mui/material';
 
-// Use a CORS proxy to bypass browser CORS restrictions
-const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+// Frontend calls the API directly; ensure CORS is enabled on the gateway
 const API_URL = 'https://07w4hdreje.execute-api.ap-south-1.amazonaws.com/DEV';
 
 function PostDischargeAssistant() {
@@ -36,7 +35,7 @@ function PostDischargeAssistant() {
           reader.readAsDataURL(file);
         });
 
-        await fetch(`${CORS_PROXY}${encodeURIComponent(API_URL)}`, {
+        await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -62,17 +61,11 @@ function PostDischargeAssistant() {
     setLoading(true);
 
     try {
-      const response = await fetch(
-        `${CORS_PROXY}${encodeURIComponent(API_URL)}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'query',
-            question,
-          }),
-        }
-      );
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'query', question }),
+      });
       const data = await response.json();
       setAnswer(data.answer);
     } catch (err) {
@@ -92,12 +85,7 @@ function PostDischargeAssistant() {
       {/* File Upload Section */}
       <Box sx={{ my: 2 }}>
         <Typography variant="subtitle1">Upload Discharge Summaries</Typography>
-        <input
-          type="file"
-          accept=".pdf,.txt"
-          multiple
-          onChange={handleFileSelect}
-        />
+        <input type="file" accept=".pdf,.txt" multiple onChange={handleFileSelect} />
         <Button
           variant="contained"
           sx={{ mt: 1 }}
