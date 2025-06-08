@@ -1,6 +1,10 @@
 import React from 'react';
 import { Box, Typography, Button, TextField, CircularProgress } from '@mui/material';
 
+// Use a CORS proxy to bypass browser CORS restrictions
+const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+const API_URL = 'https://07w4hdreje.execute-api.ap-south-1.amazonaws.com/DEV';
+
 function PostDischargeAssistant() {
   const [files, setFiles] = React.useState([]);
   const [question, setQuestion] = React.useState('');
@@ -26,7 +30,6 @@ function PostDischargeAssistant() {
         const base64String = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => {
-            // reader.result is "data:<mime>;base64,<data>"
             const [, b64] = reader.result.split(',');
             resolve(b64);
           };
@@ -34,7 +37,7 @@ function PostDischargeAssistant() {
           reader.readAsDataURL(file);
         });
 
-        await fetch('https://07w4hdreje.execute-api.ap-south-1.amazonaws.com/DEV', {
+        await fetch(`${CORS_PROXY}${encodeURIComponent(API_URL)}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -63,7 +66,7 @@ function PostDischargeAssistant() {
 
     try {
       const response = await fetch(
-        'https://07w4hdreje.execute-api.ap-south-1.amazonaws.com/DEV',
+        `${CORS_PROXY}${encodeURIComponent(API_URL)}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
