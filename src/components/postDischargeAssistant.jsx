@@ -13,46 +13,36 @@ function PostDischargeAssistant() {
     setFiles(Array.from(e.target.files)); // convert FileList to array
   };
 
-  // ✅ Upload handler
+  // ✅ Upload handler - send files directly to Lambda API
   const handleFileUpload = async () => {
     if (files.length === 0) return alert('Please select at least one file to upload.');
     setLoading(true);
 
-    for (const file of files) {
-      // 1️⃣ Get presigned URL for each file
-      const presignedRes = await fetch('/api-server/getPresignedUrl.js', {
-        method: 'POST',
-        body: JSON.stringify({
-          fileName: file.name,
-          bucket: 'pdf-upload-bucket-mypharma',
-          keyPrefix: 'uploadDischargeDocuments/user1/',
-        }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const { url, key } = await presignedRes.json();
+    try {
+      for (const file of files) {
+        // ✅ Read file as ArrayBuffer and convert to base64
+        const arrayBuffer = await file.arrayBuffer();
+        const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
-      // 2️⃣ Upload file to S3
-      await fetch(url, {
-        method: 'PUT',
-        body: file,
-      });
+        // ✅ Send file to Lambda API (no presigned URL)
+        await fetch('https://07w4hdreje.execute-api.ap-south-1.amazonaws.com/DEV', {
+          method: 'POST',
+          headers: {
+            'Content-Type': file.type, // e.g., application/pdf
+            'file-name': file.name,
+          },
+          body: base64String,
+        });
+      }
 
-      // 3️⃣ Tell backend to process uploaded file (create embeddings)
-      await fetch('/api/postDischargeAssistant', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'upload',
-          bucket: 'pdf-upload-bucket-mypharma',
-          key: key,
-        }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      setFileUploaded(true);
+      alert('Files uploaded and processed successfully! You can now ask questions.');
+    } catch (err) {
+      console.error(err);
+      alert('Error uploading files. Please try again.');
+    } finally {
+      setLoading(false);
     }
-
-    // 4️⃣ Show success
-    setLoading(false);
-    setFileUploaded(true);
-    alert('Files uploaded and processed successfully! You can now ask questions.');
   };
 
   // ✅ Question handler
@@ -60,17 +50,23 @@ function PostDischargeAssistant() {
     if (!question) return;
     setLoading(true);
 
-    const response = await fetch('/api/postDischargeAssistant', {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'query',
-        question: question,
-      }),
-      headers: { 'Content-Type': 'application/json' },
-    });
-    const data = await response.json();
-    setAnswer(data.answer);
-    setLoading(false);
+    try {
+      const response = await fetch('https://07w4hdreje.execute-api.ap-south-1.amazonaws.com/DEV', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'query',
+          question: question,
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      setAnswer(data.answer);
+    } catch (err) {
+      console.error(err);
+      alert('Error asking question. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
