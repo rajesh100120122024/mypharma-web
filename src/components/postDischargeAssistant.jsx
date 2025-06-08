@@ -2,41 +2,45 @@ import React from 'react';
 import { Box, Typography, Button, TextField, CircularProgress } from '@mui/material';
 
 function PostDischargeAssistant() {
-  const [files, setFiles] = React.useState([]); // ✅ Array for multiple files
+  const [files, setFiles] = React.useState([]);
   const [question, setQuestion] = React.useState('');
   const [answer, setAnswer] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [fileUploaded, setFileUploaded] = React.useState(false);
 
-  // ✅ File selection handler
+  // Handle file selection
   const handleFileSelect = (e) => {
-    setFiles(Array.from(e.target.files)); // convert FileList to array
+    setFiles(Array.from(e.target.files));
   };
 
-  // ✅ Upload handler - send files directly to Lambda API
+  // Upload each file as a JSON payload with base64 data
   const handleFileUpload = async () => {
-    if (files.length === 0) return alert('Please select at least one file to upload.');
+    if (files.length === 0) {
+      return alert('Please select at least one file.');
+    }
     setLoading(true);
 
     try {
       for (const file of files) {
-        // ✅ Read file as ArrayBuffer and convert to base64
         const arrayBuffer = await file.arrayBuffer();
-        const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        const base64String = btoa(
+          String.fromCharCode(...new Uint8Array(arrayBuffer))
+        );
 
-        // ✅ Send file to Lambda API (no presigned URL)
         await fetch('https://07w4hdreje.execute-api.ap-south-1.amazonaws.com/DEV', {
           method: 'POST',
           headers: {
-            'Content-Type': file.type, // e.g., application/pdf
+            'Content-Type': 'application/json',
             'file-name': file.name,
           },
-          body: base64String,
+          body: JSON.stringify({
+            fileBase64: base64String
+          }),
         });
       }
 
       setFileUploaded(true);
-      alert('Files uploaded and processed successfully! You can now ask questions.');
+      alert('Files uploaded and processed successfully!');
     } catch (err) {
       console.error(err);
       alert('Error uploading files. Please try again.');
@@ -45,20 +49,23 @@ function PostDischargeAssistant() {
     }
   };
 
-  // ✅ Question handler
+  // Ask a question once upload is done
   const handleAskQuestion = async () => {
     if (!question) return;
     setLoading(true);
 
     try {
-      const response = await fetch('https://07w4hdreje.execute-api.ap-south-1.amazonaws.com/DEV', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'query',
-          question: question,
-        }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const response = await fetch(
+        'https://07w4hdreje.execute-api.ap-south-1.amazonaws.com/DEV',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'query',
+            question,
+          }),
+        }
+      );
       const data = await response.json();
       setAnswer(data.answer);
     } catch (err) {
@@ -70,12 +77,12 @@ function PostDischargeAssistant() {
   };
 
   return (
-    <Box>
+    <Box sx={{ p: 2 }}>
       <Typography variant="h5" gutterBottom>
         Post-Discharge Care Assistant
       </Typography>
 
-      {/* ✅ File Upload */}
+      {/* File Upload Section */}
       <Box sx={{ my: 2 }}>
         <Typography variant="subtitle1">Upload Discharge Summaries</Typography>
         <input
@@ -94,7 +101,7 @@ function PostDischargeAssistant() {
         </Button>
       </Box>
 
-      {/* ✅ Ask Questions only if file is uploaded */}
+      {/* Question Section (shown after upload) */}
       {fileUploaded && (
         <Box sx={{ my: 2 }}>
           <TextField
@@ -114,7 +121,7 @@ function PostDischargeAssistant() {
         </Box>
       )}
 
-      {/* ✅ Answer Display */}
+      {/* Answer Display */}
       {answer && (
         <Box sx={{ my: 2, p: 2, bgcolor: '#e0f7fa', borderRadius: 1 }}>
           <Typography variant="subtitle1">Answer:</Typography>
