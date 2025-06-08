@@ -17,7 +17,7 @@ function PostDischargeAssistant() {
     setFiles(Array.from(e.target.files));
   };
 
-  // Upload each file as a JSON payload with base64 data
+  // Upload each file as a JSON payload with base64 data and filename
   const handleFileUpload = async () => {
     if (files.length === 0) {
       return alert('Please select at least one file.');
@@ -26,7 +26,6 @@ function PostDischargeAssistant() {
 
     try {
       for (const file of files) {
-        // Read file as base64 using FileReader
         const base64String = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => {
@@ -39,12 +38,10 @@ function PostDischargeAssistant() {
 
         await fetch(`${CORS_PROXY}${encodeURIComponent(API_URL)}`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'file-name': file.name,
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            fileBase64: base64String
+            fileBase64: base64String,
+            fileName: file.name,
           }),
         });
       }
