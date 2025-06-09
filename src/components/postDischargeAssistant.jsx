@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Typography, Button, TextField, CircularProgress } from '@mui/material';
 
 // Frontend calls the API directly; ensure CORS is enabled on the gateway
-const API_URL = 'https://07w4hdreje.execute-api.ap-south-1.amazonaws.com/DEV';
+const API_URL = 'https://e89zq6sa7f.execute-api.ap-south-1.amazonaws.com/dev/dischargecaredetails';
 
 function PostDischargeAssistant() {
   const [files, setFiles] = React.useState([]);
