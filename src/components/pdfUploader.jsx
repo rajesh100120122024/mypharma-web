@@ -7,7 +7,7 @@ import { CloudUpload, Download } from "@mui/icons-material";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { s3, BUCKET } from "../awsConfig";
 
-const START_API = "https://xxxxxx.execute-api.ap-south-1.amazonaws.com/Prod/start";
+const START_API = "https://inordedh6h.execute-api.ap-south-1.amazonaws.com/Prod/start";
 // We'll try a different CORS proxy that might work better
 const CORS_PROXY = "https://api.allorigins.win/raw?url=";
 const GET_RESULT_API = "https://xxxxx.execute-api.ap-south-1.amazonaws.com/prod";
