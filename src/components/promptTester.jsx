@@ -4,6 +4,8 @@ import {
   CircularProgress, Input, Alert
 } from "@mui/material";
 import { CloudUpload } from "@mui/icons-material";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { s3, BUCKET } from "../awsConfig";
 
 function PromptTester() {
   const [prompt, setPrompt] = useState("");
@@ -86,7 +88,7 @@ function PromptTester() {
         <select value={provider} onChange={(e) => {
           setProvider(e.target.value);
           setModel(modelOptions[e.target.value][0]);
-        }} style={{ width: "100%", padding: 6, marginBottom: 12, fontSize: 14 }}>
+        }} style={{ width: "100%", padding: 4, marginBottom: 10, fontSize: 12 }}>
           <option value="openai">OpenAI</option>
           <option value="claude">Claude</option>
           <option value="mistral">Mistral</option>
@@ -95,7 +97,7 @@ function PromptTester() {
         </select>
 
         <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>Select Model</Typography>
-        <select value={model} onChange={(e) => setModel(e.target.value)} style={{ width: "100%", padding: 6, marginBottom: 12, fontSize: 14 }}>
+        <select value={model} onChange={(e) => setModel(e.target.value)} style={{ width: "100%", padding: 4, marginBottom: 8, fontSize: 12 }}>
           {modelOptions[provider].map(m => <option key={m} value={m}>{m}</option>)}
         </select>
 
@@ -115,12 +117,12 @@ function PromptTester() {
           label: "Presence Penalty", value: presencePenalty, setter: setPresencePenalty,
           options: ["default", "0", "0.5", "1"]
         }].map(({ label, value, setter, options }) => (
-          <Box key={label} sx={{ mb: 1 }}>
+          <Box key={label} sx={{ mb: 0.5 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{label}</Typography>
             <select
               value={value}
               onChange={(e) => setter(e.target.value)}
-              style={{ width: "100%", padding: 6, fontSize: 14 }}
+              style={{ width: "100%", padding: 4, fontSize: 12 }}
             >
               {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
