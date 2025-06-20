@@ -3,7 +3,7 @@ import {
   Box, Typography, Button, Paper,
   CircularProgress, Input, Alert
 } from "@mui/material";
-import { CloudUpload, Download } from "@mui/icons-material";
+import { CloudUpload } from "@mui/icons-material";
 
 function PromptTester() {
   const [prompt, setPrompt] = useState("");
@@ -57,22 +57,23 @@ function PromptTester() {
   };
 
   return (
-    <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", backgroundColor: "#f5faff" }}>
-      <Paper elevation={3} sx={{ p: 4, borderRadius: 4, width: "100%", maxWidth: 1000 }}>
-        <Typography variant="h5" gutterBottom>🧠 Prompt Tester</Typography>
-
-        <Typography variant="subtitle1">Enter Prompt</Typography>
+    <Box sx={{ display: "flex", justifyContent: "center", alignItems: "flex-start", minHeight: "100vh", backgroundColor: "#f5faff", padding: 4 }}>
+      <Paper elevation={3} sx={{ p: 3, borderRadius: 2, width: "45%", backgroundColor: "#1976d2", color: "white", marginRight: 3 }}>
+        <Typography variant="h5" gutterBottom>Prompt Tester</Typography>
+        <Typography variant="subtitle1" sx={{ color: 'white' }}>Enter Prompt</Typography>
         <Input
           multiline
-          rows={5}
+          rows={12}
           fullWidth
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="Type your prompt here..."
-          sx={{ mb: 2 }}
+          sx={{ mb: 2, backgroundColor: "white", color: "black", borderRadius: 1, p: 1 }}
         />
+      </Paper>
 
-        <Typography variant="subtitle1">Select Model</Typography>
+      <Paper elevation={3} sx={{ p: 3, borderRadius: 2, width: "55%" }}>
+        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2 }}>Select Model</Typography>
         <select value={model} onChange={(e) => setModel(e.target.value)} style={{ width: "100%", padding: 10, marginBottom: 16 }}>
           <option value="gpt-4">GPT-4</option>
           <option value="claude">Claude 3 Opus</option>
@@ -98,7 +99,7 @@ function PromptTester() {
           options: ["default", "0", "0.5", "1"]
         }].map(({ label, value, setter, options }) => (
           <Box key={label} sx={{ mb: 2 }}>
-            <Typography variant="subtitle1">{label}</Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>{label}</Typography>
             <select
               value={value}
               onChange={(e) => setter(e.target.value)}
