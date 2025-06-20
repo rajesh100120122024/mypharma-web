@@ -7,6 +7,7 @@ import { CloudUpload } from "@mui/icons-material";
 
 function PromptTester() {
   const [prompt, setPrompt] = useState("");
+  const [provider, setProvider] = useState("openai");
   const [model, setModel] = useState("gpt-4");
   const [temperature, setTemperature] = useState("default");
   const [maxTokens, setMaxTokens] = useState("default");
@@ -17,6 +18,14 @@ function PromptTester() {
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const modelOptions = {
+    openai: ["gpt-4", "gpt-3.5-turbo", "gpt-3.5-turbo-16k"],
+    claude: ["claude-3-opus", "claude-3-sonnet"],
+    mistral: ["mistral-7b", "mixtral-8x7b"],
+    cohere: ["command-r", "command-r-plus"],
+    meta: ["llama3-70b", "llama3-8b"]
+  };
 
   const runPrompt = async () => {
     setLoading(true);
@@ -73,13 +82,21 @@ function PromptTester() {
       </Paper>
 
       <Paper elevation={3} sx={{ p: 2, borderRadius: 2, width: "50%" }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>Select Provider</Typography>
+        <select value={provider} onChange={(e) => {
+          setProvider(e.target.value);
+          setModel(modelOptions[e.target.value][0]);
+        }} style={{ width: "100%", padding: 6, marginBottom: 12, fontSize: 14 }}>
+          <option value="openai">OpenAI</option>
+          <option value="claude">Claude</option>
+          <option value="mistral">Mistral</option>
+          <option value="cohere">Cohere</option>
+          <option value="meta">Meta (LLaMA)</option>
+        </select>
+
         <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>Select Model</Typography>
         <select value={model} onChange={(e) => setModel(e.target.value)} style={{ width: "100%", padding: 6, marginBottom: 12, fontSize: 14 }}>
-          <option value="gpt-4">GPT-4</option>
-          <option value="claude">Claude 3 Opus</option>
-          <option value="mistral">Mistral 7B (Groq)</option>
-          <option value="command-r">Cohere Command R+</option>
-          <option value="llama3">LLaMA 3 (OpenRouter)</option>
+          {modelOptions[provider].map(m => <option key={m} value={m}>{m}</option>)}
         </select>
 
         {[{
