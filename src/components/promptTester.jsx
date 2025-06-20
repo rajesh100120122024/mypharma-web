@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Box, Typography, Button, Paper,
-  CircularProgress, Input, Alert
+  CircularProgress, Input, Alert, Modal
 } from "@mui/material";
 import { CloudUpload } from "@mui/icons-material";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
@@ -20,6 +20,7 @@ function PromptTester() {
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const modelOptions = {
     openai: ["gpt-4", "gpt-3.5-turbo", "gpt-3.5-turbo-16k"],
@@ -60,6 +61,7 @@ function PromptTester() {
       const data = await res.json();
       setResponse(data.response);
       setInfo({ tokens: data.tokens_used, latency: data.latency });
+      setModalOpen(true);
     } catch (err) {
       setError(err.name === 'AbortError' ? "Request timed out" : err.message);
     } finally {
@@ -142,16 +144,19 @@ function PromptTester() {
         </Button>
 
         {error && <Alert severity="error" sx={{ mt: 2 }}>❌ {error}</Alert>}
-
-        {response && (
-          <Paper variant="outlined" sx={{ mt: 4, p: 2 }}>
-            <Typography variant="h6">🧾 Response</Typography>
-            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mt: 1 }}>{response}</Typography>
-            <Typography variant="body2" sx={{ mt: 2 }}>⏱️ Latency: {info?.latency}s</Typography>
-            <Typography variant="body2">📊 Tokens Used: {info?.tokens}</Typography>
-          </Paper>
-        )}
       </Paper>
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
+        <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 600, bgcolor: 'background.paper', boxShadow: 24, p: 4, borderRadius: 2 }}>
+          <Typography variant="h6" gutterBottom>🧾 LLM Response</Typography>
+          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>{response}</Typography>
+          <Typography variant="body2" sx={{ mt: 2 }}>⏱️ Latency: {info?.latency}s</Typography>
+          <Typography variant="body2">📊 Tokens Used: {info?.tokens}</Typography>
+          <Box textAlign="right" mt={3}>
+            <Button variant="outlined" onClick={() => setModalOpen(false)}>Close</Button>
+          </Box>
+        </Box>
+      </Modal>
     </Box>
   );
 }
