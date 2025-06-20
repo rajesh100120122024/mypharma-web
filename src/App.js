@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Typography, List, ListItem, ListItemText } from '@mui/material';
+import PromptTester from './components/promptTester';
 import PdfUploader from './components/pdfUploader';
 import ChatBox from './components/chatBox';
 import UpdatePatientData from './components/updatePatientData';
@@ -10,6 +11,8 @@ function App() {
 
   const renderContent = () => {
     switch (selectedTab) {
+      case 'Prompt Tester':
+        return <PromptTester />;
       case 'PDF Uploader For MedicalCoders':
         return <PdfUploader />;
       case 'Chat with Assistant':
@@ -58,7 +61,7 @@ function App() {
           </Box>
 
           <List>
-            {['PDF Uploader For MedicalCoders', 'Chat with Assistant', 'UpdatePatientData', 'Post-Discharge Care Assistant', 'Settings'].map((text) => (
+            {['Prompt Tester', 'PDF Uploader For MedicalCoders', 'Chat with Assistant', 'UpdatePatientData', 'Post-Discharge Care Assistant', 'Settings'].map((text) => (
               <ListItem
                 button
                 key={text}
