@@ -72,9 +72,9 @@ function PromptTester() {
         />
       </Paper>
 
-      <Paper elevation={3} sx={{ p: 3, borderRadius: 2, width: "55%" }}>
-        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2 }}>Select Model</Typography>
-        <select value={model} onChange={(e) => setModel(e.target.value)} style={{ width: "100%", padding: 10, marginBottom: 16 }}>
+      <Paper elevation={3} sx={{ p: 2, borderRadius: 2, width: "50%" }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>Select Model</Typography>
+        <select value={model} onChange={(e) => setModel(e.target.value)} style={{ width: "100%", padding: 6, marginBottom: 12, fontSize: 14 }}>
           <option value="gpt-4">GPT-4</option>
           <option value="claude">Claude 3 Opus</option>
           <option value="mistral">Mistral 7B (Groq)</option>
@@ -98,12 +98,12 @@ function PromptTester() {
           label: "Presence Penalty", value: presencePenalty, setter: setPresencePenalty,
           options: ["default", "0", "0.5", "1"]
         }].map(({ label, value, setter, options }) => (
-          <Box key={label} sx={{ mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>{label}</Typography>
+          <Box key={label} sx={{ mb: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{label}</Typography>
             <select
               value={value}
               onChange={(e) => setter(e.target.value)}
-              style={{ width: "100%", padding: 10 }}
+              style={{ width: "100%", padding: 6, fontSize: 14 }}
             >
               {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
