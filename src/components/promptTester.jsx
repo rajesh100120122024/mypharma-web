@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import "./PromptTester.css"; // Optional external styling if needed
 
 function PromptTester() {
   const [prompt, setPrompt] = useState("");
@@ -52,80 +53,78 @@ function PromptTester() {
   };
 
   return (
-    <div style={{ maxWidth: "700px", margin: "auto" }}>
-      <h2>LLM Prompt Tester</h2>
+    <div className="prompt-tester-box">
+      <h2 className="header">🧠 Prompt Tester</h2>
+      <label className="label">Enter Prompt</label>
       <textarea
         rows={6}
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        placeholder="Enter your prompt here..."
-        style={{ width: "100%" }}
+        placeholder="Type your prompt here..."
+        className="textarea"
       />
 
-      <div><label>Model:</label>
-        <select value={model} onChange={(e) => setModel(e.target.value)}>
-          <option value="gpt-4">GPT-4</option>
-          <option value="claude">Claude 3 Opus</option>
-        </select>
-      </div>
+      <label className="label">Select Model</label>
+      <select value={model} onChange={(e) => setModel(e.target.value)} className="select">
+        <option value="gpt-4">GPT-4</option>
+        <option value="claude">Claude 3 Opus</option>
+        <option value="mistral">Mistral 7B (Groq)</option>
+        <option value="command-r">Cohere Command R+</option>
+        <option value="llama3">LLaMA 3 (OpenRouter)</option>
+      </select>
 
-      <div><label>Temperature:</label>
-        <select value={temperature} onChange={(e) => setTemperature(e.target.value)}>
-          <option value="default">Default</option>
-          <option value="0">0</option>
-          <option value="0.5">0.5</option>
-          <option value="1">1</option>
-        </select>
-      </div>
+      <label className="label">Temperature</label>
+      <select value={temperature} onChange={(e) => setTemperature(e.target.value)} className="select">
+        <option value="default">Default</option>
+        <option value="0">0</option>
+        <option value="0.5">0.5</option>
+        <option value="1">1</option>
+      </select>
 
-      <div><label>Max Tokens:</label>
-        <select value={maxTokens} onChange={(e) => setMaxTokens(e.target.value)}>
-          <option value="default">Default</option>
-          <option value="256">256</option>
-          <option value="512">512</option>
-          <option value="1024">1024</option>
-        </select>
-      </div>
+      <label className="label">Max Tokens</label>
+      <select value={maxTokens} onChange={(e) => setMaxTokens(e.target.value)} className="select">
+        <option value="default">Default</option>
+        <option value="256">256</option>
+        <option value="512">512</option>
+        <option value="1024">1024</option>
+      </select>
 
-      <div><label>Top P:</label>
-        <select value={topP} onChange={(e) => setTopP(e.target.value)}>
-          <option value="default">Default</option>
-          <option value="0.5">0.5</option>
-          <option value="0.8">0.8</option>
-          <option value="1">1</option>
-        </select>
-      </div>
+      <label className="label">Top P</label>
+      <select value={topP} onChange={(e) => setTopP(e.target.value)} className="select">
+        <option value="default">Default</option>
+        <option value="0.5">0.5</option>
+        <option value="0.8">0.8</option>
+        <option value="1">1</option>
+      </select>
 
-      <div><label>Frequency Penalty:</label>
-        <select value={frequencyPenalty} onChange={(e) => setFrequencyPenalty(e.target.value)}>
-          <option value="default">Default</option>
-          <option value="0">0</option>
-          <option value="0.5">0.5</option>
-          <option value="1">1</option>
-        </select>
-      </div>
+      <label className="label">Frequency Penalty</label>
+      <select value={frequencyPenalty} onChange={(e) => setFrequencyPenalty(e.target.value)} className="select">
+        <option value="default">Default</option>
+        <option value="0">0</option>
+        <option value="0.5">0.5</option>
+        <option value="1">1</option>
+      </select>
 
-      <div><label>Presence Penalty:</label>
-        <select value={presencePenalty} onChange={(e) => setPresencePenalty(e.target.value)}>
-          <option value="default">Default</option>
-          <option value="0">0</option>
-          <option value="0.5">0.5</option>
-          <option value="1">1</option>
-        </select>
-      </div>
+      <label className="label">Presence Penalty</label>
+      <select value={presencePenalty} onChange={(e) => setPresencePenalty(e.target.value)} className="select">
+        <option value="default">Default</option>
+        <option value="0">0</option>
+        <option value="0.5">0.5</option>
+        <option value="1">1</option>
+      </select>
 
-      <button onClick={runPrompt} style={{ marginTop: 10 }}>
-        {loading ? "Running..." : "Run Prompt"}
+      <button onClick={runPrompt} className="submit-button">
+        {loading ? "Running..." : "SUBMIT & RUN PROMPT"}
       </button>
 
-      {error && <p style={{ color: "red" }}><strong>Error:</strong> {error}</p>}
+      {error && <p className="error">❌ Error: {error}</p>}
 
       {response && (
-        <div style={{ marginTop: 20 }}>
-          <h4>LLM Response:</h4>
+        <div className="result-box">
+          <h4>🧾 Response</h4>
           <pre>{response}</pre>
-          <p><strong>Latency:</strong> {info?.latency}s</p>
-          <p><strong>Tokens Used:</strong> {info?.tokens}</p>
+          <p><strong>⏱️ Latency:</strong> {info?.latency}s</p>
+          <p><strong>📊 Tokens Used:</strong> {info?.tokens}</p>
         </div>
       )}
     </div>
