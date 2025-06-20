@@ -57,80 +57,82 @@ function PromptTester() {
   };
 
   return (
-    <Paper elevation={3} sx={{ p: 4, borderRadius: 4, maxWidth: 800, margin: "auto", mt: 5 }}>
-      <Typography variant="h5" gutterBottom>🧠 Prompt Tester</Typography>
+    <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", backgroundColor: "#f5faff" }}>
+      <Paper elevation={3} sx={{ p: 4, borderRadius: 4, width: "100%", maxWidth: 1000 }}>
+        <Typography variant="h5" gutterBottom>🧠 Prompt Tester</Typography>
 
-      <Typography variant="subtitle1">Enter Prompt</Typography>
-      <Input
-        multiline
-        rows={5}
-        fullWidth
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        placeholder="Type your prompt here..."
-        sx={{ mb: 2 }}
-      />
+        <Typography variant="subtitle1">Enter Prompt</Typography>
+        <Input
+          multiline
+          rows={5}
+          fullWidth
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="Type your prompt here..."
+          sx={{ mb: 2 }}
+        />
 
-      <Typography variant="subtitle1">Select Model</Typography>
-      <select value={model} onChange={(e) => setModel(e.target.value)} style={{ width: "100%", padding: 10, marginBottom: 16 }}>
-        <option value="gpt-4">GPT-4</option>
-        <option value="claude">Claude 3 Opus</option>
-        <option value="mistral">Mistral 7B (Groq)</option>
-        <option value="command-r">Cohere Command R+</option>
-        <option value="llama3">LLaMA 3 (OpenRouter)</option>
-      </select>
+        <Typography variant="subtitle1">Select Model</Typography>
+        <select value={model} onChange={(e) => setModel(e.target.value)} style={{ width: "100%", padding: 10, marginBottom: 16 }}>
+          <option value="gpt-4">GPT-4</option>
+          <option value="claude">Claude 3 Opus</option>
+          <option value="mistral">Mistral 7B (Groq)</option>
+          <option value="command-r">Cohere Command R+</option>
+          <option value="llama3">LLaMA 3 (OpenRouter)</option>
+        </select>
 
-      {[{
-        label: "Temperature", value: temperature, setter: setTemperature,
-        options: ["default", "0", "0.5", "1"]
-      }, {
-        label: "Max Tokens", value: maxTokens, setter: setMaxTokens,
-        options: ["default", "256", "512", "1024"]
-      }, {
-        label: "Top P", value: topP, setter: setTopP,
-        options: ["default", "0.5", "0.8", "1"]
-      }, {
-        label: "Frequency Penalty", value: frequencyPenalty, setter: setFrequencyPenalty,
-        options: ["default", "0", "0.5", "1"]
-      }, {
-        label: "Presence Penalty", value: presencePenalty, setter: setPresencePenalty,
-        options: ["default", "0", "0.5", "1"]
-      }].map(({ label, value, setter, options }) => (
-        <Box key={label} sx={{ mb: 2 }}>
-          <Typography variant="subtitle1">{label}</Typography>
-          <select
-            value={value}
-            onChange={(e) => setter(e.target.value)}
-            style={{ width: "100%", padding: 10 }}
-          >
-            {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-          </select>
-        </Box>
-      ))}
+        {[{
+          label: "Temperature", value: temperature, setter: setTemperature,
+          options: ["default", "0", "0.5", "1"]
+        }, {
+          label: "Max Tokens", value: maxTokens, setter: setMaxTokens,
+          options: ["default", "256", "512", "1024"]
+        }, {
+          label: "Top P", value: topP, setter: setTopP,
+          options: ["default", "0.5", "0.8", "1"]
+        }, {
+          label: "Frequency Penalty", value: frequencyPenalty, setter: setFrequencyPenalty,
+          options: ["default", "0", "0.5", "1"]
+        }, {
+          label: "Presence Penalty", value: presencePenalty, setter: setPresencePenalty,
+          options: ["default", "0", "0.5", "1"]
+        }].map(({ label, value, setter, options }) => (
+          <Box key={label} sx={{ mb: 2 }}>
+            <Typography variant="subtitle1">{label}</Typography>
+            <select
+              value={value}
+              onChange={(e) => setter(e.target.value)}
+              style={{ width: "100%", padding: 10 }}
+            >
+              {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+          </Box>
+        ))}
 
-      <Button
-        variant="contained"
-        color="primary"
-        startIcon={<CloudUpload />}
-        onClick={runPrompt}
-        disabled={loading}
-        fullWidth
-        sx={{ mt: 2 }}
-      >
-        {loading ? <CircularProgress size={24} /> : "Submit & Run Prompt"}
-      </Button>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<CloudUpload />}
+          onClick={runPrompt}
+          disabled={loading}
+          fullWidth
+          sx={{ mt: 2 }}
+        >
+          {loading ? <CircularProgress size={24} /> : "Submit & Run Prompt"}
+        </Button>
 
-      {error && <Alert severity="error" sx={{ mt: 2 }}>❌ {error}</Alert>}
+        {error && <Alert severity="error" sx={{ mt: 2 }}>❌ {error}</Alert>}
 
-      {response && (
-        <Paper variant="outlined" sx={{ mt: 4, p: 2 }}>
-          <Typography variant="h6">🧾 Response</Typography>
-          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mt: 1 }}>{response}</Typography>
-          <Typography variant="body2" sx={{ mt: 2 }}>⏱️ Latency: {info?.latency}s</Typography>
-          <Typography variant="body2">📊 Tokens Used: {info?.tokens}</Typography>
-        </Paper>
-      )}
-    </Paper>
+        {response && (
+          <Paper variant="outlined" sx={{ mt: 4, p: 2 }}>
+            <Typography variant="h6">🧾 Response</Typography>
+            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mt: 1 }}>{response}</Typography>
+            <Typography variant="body2" sx={{ mt: 2 }}>⏱️ Latency: {info?.latency}s</Typography>
+            <Typography variant="body2">📊 Tokens Used: {info?.tokens}</Typography>
+          </Paper>
+        )}
+      </Paper>
+    </Box>
   );
 }
 
